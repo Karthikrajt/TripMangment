@@ -6,6 +6,8 @@
 #   VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID,
 #   VITE_FIREBASE_VAPID_KEY (optional), VITE_BOOTSTRAP_ADMIN_EMAIL,
 #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+#   SUPABASE_ACCESS_TOKEN     – personal access token (supabase.com → Account → Access Tokens)
+#   SUPABASE_PROJECT_REF      – the project's reference id
 # The live URL is https://<VITE_FIREBASE_PROJECT_ID>.web.app
 name: Deploy
 on:
@@ -44,3 +46,16 @@ jobs:
           echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           npx firebase deploy --only hosting,firestore:rules,firestore:indexes --project "${{ secrets.VITE_FIREBASE_PROJECT_ID }}" --non-interactive
+      - name: Deploy Supabase Edge Functions
+        if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          P="${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          npx -y supabase@2 secrets set --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+            FIREBASE_PROJECT_ID="$P" TRIP_ID=main APP_URL="https://$P.web.app" \
+            ALLOWED_ORIGINS="https://$P.web.app,https://$P.firebaseapp.com,http://localhost:5173"
+          npx -y supabase@2 functions deploy files --no-verify-jwt --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          npx -y supabase@2 functions deploy notify --no-verify-jwt --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+      - name: Live URL
+        run: echo "App is live at https://${{ secrets.VITE_FIREBASE_PROJECT_ID }}.web.app" >> "$GITHUB_STEP_SUMMARY"
