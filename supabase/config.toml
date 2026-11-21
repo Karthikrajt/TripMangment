@@ -1,0 +1,15 @@
+# Supabase project configuration (only the parts this app uses).
+project_id = "trip-manager"
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"
+
+# The Edge Functions authenticate callers with a *Firebase* ID token, so the
+# Supabase gateway JWT check must be disabled. Each function verifies the
+# Firebase token itself (signature, issuer, audience, expiry).
+[functions.files]
+verify_jwt = false
+
+[functions.notify]
+verify_jwt = false

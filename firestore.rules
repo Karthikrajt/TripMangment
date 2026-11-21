@@ -1,0 +1,329 @@
+rules_version = '2';
+
+// ===========================================================================
+// Trip Manager – Firestore Security Rules
+//
+// These rules are the authoritative permission layer. The React UI only hides
+// controls; every read/write below is enforced server-side by Firestore.
+//
+// Roles live in trips/{tripId}/members/{uid}: role = admin|member,
+// status = pending|approved|rejected|disabled.
+//
+// NOTE: rules do not filter query results. Every client query must already be
+// restricted to documents the caller is allowed to read (see docs/SECURITY.md).
+// ===========================================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------------------------------------------------
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    // !!! EDIT BEFORE DEPLOYING: the Google account allowed to create the trip.
+    function isBootstrapAdmin() {
+      return signedIn()
+        && request.auth.token.email == 'you@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    function tripPath(tripId) { return /databases/$(database)/documents/trips/$(tripId); }
+    function memberPath(tripId, u) { return /databases/$(database)/documents/trips/$(tripId)/members/$(u); }
+    function trip(tripId) { return get(tripPath(tripId)).data; }
+    function myMember(tripId) { return get(memberPath(tripId, uid())).data; }
+
+    function isApproved(tripId) {
+      return signedIn() && exists(memberPath(tripId, uid())) && myMember(tripId).status == 'approved';
+    }
+    function isAdmin(tripId) { return isApproved(tripId) && myMember(tripId).role == 'admin'; }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function changed() { return incoming().diff(existing()).affectedKeys(); }
+    function unchanged(keys) { return !changed().hasAny(keys); }
+
+    function str(v, max) { return v is string && v.size() <= max; }
+    function optStr(d, k, max) { return !(k in d) || str(d[k], max); }
+    function isDate(v) { return v is string && (v == '' || v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')); }
+    function isTime(v) { return v is string && (v == '' || v.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')); }
+    function strList(v, max) { return v is list && v.size() <= max; }
+    function filePathFor(tripId, kind, v) {
+      return v == '' || (v is string && v.matches('^trips/' + tripId + '/' + kind + '/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+[.][a-z0-9]+$'));
+    }
+    function ownFilePath(tripId, kind, v) {
+      return v is string && v.matches('^trips/' + tripId + '/' + kind + '/' + uid() + '/[A-Za-z0-9_-]+[.][a-z0-9]+$');
+    }
+
+    // ---------- user profile (private to the user) -------------------------
+    match /users/{userId} {
+      allow read: if signedIn() && uid() == userId;
+      allow create, update: if signedIn() && uid() == userId
+        && incoming().keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'notifLastReadAt', 'chatLastReadAt', 'createdAt', 'updatedAt'])
+        && incoming().uid == userId
+        && str(incoming().displayName, 100) && str(incoming().email, 200);
+      allow delete: if false;
+    }
+
+    match /trips/{tripId} {
+      // ---------- trip document --------------------------------------------
+      allow read: if isApproved(tripId);
+      allow create: if isBootstrapAdmin()
+        && incoming().ownerUid == uid()
+        && str(incoming().name, 120) && str(incoming().destination, 120)
+        && isDate(incoming().startDate) && isDate(incoming().endDate)
+        && incoming().ticketsLocked is bool;
+      allow update: if isAdmin(tripId)
+        && unchanged(['ownerUid', 'createdAt'])
+        && str(incoming().name, 120) && str(incoming().destination, 120)
+        && str(incoming().description, 2000) && str(incoming().emergencyInfo, 2000)
+        && isDate(incoming().startDate) && isDate(incoming().endDate)
+        && strList(incoming().importantContacts, 30)
+        && incoming().ticketsLocked is bool;
+      allow delete: if false;
+
+      // Minimal public summary so signed-in, not-yet-approved users can see
+      // which trip they are requesting to join.
+      match /public/{docId} {
+        allow read: if signedIn();
+        allow write: if isAdmin(tripId)
+          || (isBootstrapAdmin() && existsAfter(tripPath(tripId)) && getAfter(tripPath(tripId)).data.ownerUid == uid());
+      }
+
+      // ---------- members & access requests ---------------------------------
+      match /members/{memberId} {
+        function isSelf() { return signedIn() && uid() == memberId; }
+        function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'updatedAt']; }
+        function validMember(d) {
+          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt'])
+            && d.uid == memberId
+            && str(d.displayName, 100) && str(d.email, 200) && str(d.photoURL, 1000)
+            && str(d.phone, 30) && str(d.emergencyContact, 200) && str(d.relationship, 100)
+            && str(d.requestNote, 500)
+            && d.role in ['admin', 'member']
+            && d.status in ['pending', 'approved', 'rejected', 'disabled'];
+        }
+        function isOwnerTarget() { return trip(tripId).ownerUid == memberId; }
+
+        allow read: if isSelf() || isApproved(tripId);
+
+        // A signed-in user may only create their OWN pending request, with
+        // their verified Google email. The trip owner bootstraps as admin.
+        allow create: if isSelf() && validMember(incoming())
+          && incoming().email == request.auth.token.email
+          && (
+            (incoming().status == 'pending' && incoming().role == 'member' && incoming().requestedAt == request.time && incoming().decidedBy == '')
+            || (incoming().status == 'approved' && incoming().role == 'admin'
+                && existsAfter(tripPath(tripId)) && getAfter(tripPath(tripId)).data.ownerUid == uid())
+          );
+
+        allow update: if validMember(incoming()) && unchanged(['uid', 'email']) && (
+          // Admin: full control, except nobody but the owner may change the owner's role/status.
+          (isAdmin(tripId) && (!isOwnerTarget() || unchanged(['role', 'status']) || isSelf()))
+          // Self: profile fields only.
+          || (isSelf() && changed().hasOnly(profileKeys()))
+          // Self: re-request access after a rejection.
+          || (isSelf() && existing().status == 'rejected' && incoming().status == 'pending'
+              && incoming().role == 'member' && incoming().requestedAt == request.time
+              && changed().hasOnly(profileKeys().concat(['status', 'requestNote', 'requestedAt'])))
+        );
+
+        allow delete: if isAdmin(tripId) && !isOwnerTarget();
+      }
+
+      // ---------- admin-managed shared content -----------------------------
+      match /itinerary/{itemId} {
+        allow read: if isApproved(tripId);
+        allow create, update: if isAdmin(tripId)
+          && incoming().dayNumber is int && incoming().dayNumber >= 0 && incoming().dayNumber <= 60
+          && isDate(incoming().date) && isTime(incoming().startTime) && isTime(incoming().endTime)
+          && str(incoming().title, 150) && str(incoming().description, 3000)
+          && str(incoming().location, 300) && str(incoming().mapsUrl, 1000)
+          && incoming().published is bool;
+        allow delete: if isAdmin(tripId);
+      }
+
+      match /accommodations/{hotelId} {
+        allow read: if isApproved(tripId);
+        allow create, update: if isAdmin(tripId)
+          && str(incoming().name, 150) && str(incoming().address, 500)
+          && isDate(incoming().checkInDate) && isDate(incoming().checkOutDate)
+          && isTime(incoming().checkInTime) && isTime(incoming().checkOutTime)
+          && filePathFor(tripId, 'accommodation', incoming().filePath);
+        allow delete: if isAdmin(tripId);
+      }
+
+      match /rooms/{roomId} {
+        allow read: if isApproved(tripId);
+        allow create, update: if isAdmin(tripId)
+          && str(incoming().name, 100) && strList(incoming().memberUids, 30)
+          && incoming().bedCapacity is int && incoming().bedCapacity >= 0;
+        allow delete: if isAdmin(tripId);
+      }
+
+      match /transport/{transportId} {
+        allow read: if isApproved(tripId);
+        allow create, update: if isAdmin(tripId)
+          && str(incoming().vehicleType, 60) && str(incoming().driverPhone, 30)
+          && incoming().capacity is int && incoming().capacity >= 0
+          && strList(incoming().memberUids, 100)
+          && isDate(incoming().pickupDate) && isTime(incoming().pickupTime);
+        allow delete: if isAdmin(tripId);
+      }
+
+      match /announcements/{announcementId} {
+        allow read: if isApproved(tripId);
+        allow create: if isAdmin(tripId) && incoming().createdBy == uid() && incoming().createdAt == request.time
+          && str(incoming().title, 150) && str(incoming().body, 3000) && incoming().priority in ['normal', 'important'];
+        allow update: if isAdmin(tripId) && unchanged(['createdBy', 'createdAt']);
+        allow delete: if isAdmin(tripId);
+      }
+
+      // ---------- train tickets (shared across the whole trip) ---------------
+      // Every approved member can create and read every ticket. Only the
+      // uploader (while unlocked) or an admin can edit/delete a ticket.
+      match /tickets/{ticketId} {
+        function validTicket(d) {
+          return d.keys().hasOnly(['title', 'pnr', 'trainName', 'trainNumber', 'journeyDate', 'boardingStation', 'destinationStation', 'departureTime', 'arrivalTime', 'passengerNames', 'passengerUids', 'coach', 'seats', 'travelClass', 'notes', 'filePath', 'fileName', 'fileType', 'fileSize', 'uploadedBy', 'uploadedByName', 'locked', 'createdAt', 'updatedAt'])
+            && str(d.title, 150) && str(d.pnr, 20) && str(d.trainName, 100) && str(d.trainNumber, 10)
+            && isDate(d.journeyDate) && isTime(d.departureTime) && isTime(d.arrivalTime)
+            && str(d.boardingStation, 100) && str(d.destinationStation, 100)
+            && strList(d.passengerNames, 50) && strList(d.passengerUids, 50)
+            && str(d.coach, 20) && str(d.seats, 200) && str(d.travelClass, 30) && str(d.notes, 1000)
+            && filePathFor(tripId, 'ticket', d.filePath) && d.filePath != ''
+            && str(d.fileName, 200) && d.fileType in ['application/pdf', 'image/jpeg', 'image/png']
+            && d.fileSize is int && d.fileSize > 0 && d.fileSize <= 5242880
+            && d.locked is bool;
+        }
+        function memberMayModify() {
+          return existing().uploadedBy == uid() && existing().locked == false && trip(tripId).ticketsLocked == false;
+        }
+
+        allow read: if isApproved(tripId);
+
+        allow create: if isApproved(tripId) && validTicket(incoming())
+          && incoming().uploadedBy == uid()
+          && incoming().createdAt == request.time
+          && (incoming().locked == false || isAdmin(tripId))
+          && (isAdmin(tripId) || ownFilePath(tripId, 'ticket', incoming().filePath));
+
+        allow update: if validTicket(incoming()) && unchanged(['uploadedBy', 'uploadedByName', 'createdAt']) && (
+          isAdmin(tripId)
+          || (isApproved(tripId) && memberMayModify() && unchanged(['locked'])
+              && (unchanged(['filePath']) || ownFilePath(tripId, 'ticket', incoming().filePath)))
+        );
+
+        allow delete: if isAdmin(tripId) || (isApproved(tripId) && memberMayModify());
+      }
+
+      // ---------- expenses -----------------------------------------------------
+      match /expenses/{expenseId} {
+        function validExpense(d) {
+          return d.keys().hasOnly(['title', 'category', 'amountPaise', 'expenseDate', 'paidBy', 'description', 'receiptPath', 'receiptName', 'splitMethod', 'splits', 'status', 'reviewNote', 'reviewedBy', 'reviewedAt', 'createdBy', 'createdAt', 'updatedAt'])
+            && str(d.title, 150) && str(d.description, 1000)
+            && d.category in ['Train', 'Bus', 'Hotel', 'Food', 'Snacks', 'Fuel', 'Local transport', 'Entry tickets', 'Shopping', 'Other']
+            && d.amountPaise is int && d.amountPaise > 0 && d.amountPaise <= 1000000000
+            && isDate(d.expenseDate) && d.expenseDate != ''
+            && d.paidBy is string && exists(memberPath(tripId, d.paidBy))
+            && d.splitMethod in ['equal_all', 'equal_selected', 'custom', 'trip_wide']
+            && d.splits is map && d.splits.size() >= 1 && d.splits.size() <= 100
+            && d.status in ['pending', 'approved', 'rejected']
+            && str(d.reviewNote, 500)
+            && filePathFor(tripId, 'receipt', d.receiptPath) && str(d.receiptName, 200);
+        }
+
+        allow read: if isApproved(tripId);
+
+        // The document id is the client-generated idempotency key, so a
+        // retried offline submission can never create a duplicate.
+        allow create: if isApproved(tripId) && validExpense(incoming())
+          && incoming().createdBy == uid()
+          && incoming().createdAt == request.time
+          && incoming().status == 'pending'
+          && incoming().reviewedBy == '' && incoming().reviewedAt == null;
+
+        allow update: if validExpense(incoming()) && unchanged(['createdBy', 'createdAt']) && (
+          // Admin may edit, approve or reject. Reviews must be attributed.
+          (isAdmin(tripId) && (unchanged(['status']) || incoming().reviewedBy == uid()))
+          // Owner may edit only while pending and cannot review.
+          || (isApproved(tripId) && existing().createdBy == uid() && existing().status == 'pending'
+              && incoming().status == 'pending'
+              && unchanged(['reviewedBy', 'reviewedAt', 'reviewNote']))
+        );
+
+        allow delete: if isAdmin(tripId)
+          || (isApproved(tripId) && existing().createdBy == uid() && existing().status == 'pending');
+      }
+
+      // Settlement records are separate from expenses; admin-managed.
+      match /settlements/{settlementId} {
+        allow read: if isApproved(tripId);
+        allow create, update: if isAdmin(tripId)
+          && incoming().amountPaise is int && incoming().amountPaise > 0
+          && incoming().fromUid is string && incoming().toUid is string && incoming().fromUid != incoming().toUid
+          && incoming().status in ['open', 'paid'] && isDate(incoming().paidDate)
+          && str(incoming().reference, 200) && str(incoming().notes, 500);
+        allow delete: if isAdmin(tripId);
+      }
+
+      // ---------- group chat ---------------------------------------------------
+      match /messages/{messageId} {
+        allow read: if isApproved(tripId);
+        allow create: if isApproved(tripId)
+          && incoming().keys().hasOnly(['senderUid', 'senderName', 'senderPhoto', 'text', 'kind', 'filePath', 'fileName', 'fileType', 'createdAt'])
+          && incoming().senderUid == uid()
+          && incoming().createdAt == request.time
+          && str(incoming().text, 2000) && str(incoming().senderName, 100)
+          && (incoming().kind in ['text', 'image', 'file'] || (incoming().kind == 'announcement' && isAdmin(tripId)))
+          && filePathFor(tripId, 'chat', incoming().filePath)
+          && (incoming().filePath == '' || ownFilePath(tripId, 'chat', incoming().filePath));
+        allow update: if false;
+        allow delete: if isAdmin(tripId) || (isApproved(tripId) && existing().senderUid == uid());
+      }
+
+      // ---------- in-app notifications (source of truth) -----------------------
+      // target: 'all' | 'admins' | <uid>. Clients must query with
+      // where('target', 'in', [...allowed targets]).
+      match /notifications/{notificationId} {
+        allow read: if isApproved(tripId) && (
+          existing().target == 'all'
+          || existing().target == uid()
+          || (existing().target == 'admins' && isAdmin(tripId))
+        );
+        allow create: if signedIn()
+          && incoming().keys().hasOnly(['type', 'title', 'body', 'link', 'target', 'createdBy', 'createdAt'])
+          && incoming().createdBy == uid() && incoming().createdAt == request.time
+          && str(incoming().title, 150) && str(incoming().body, 500) && str(incoming().link, 200)
+          && incoming().target is string
+          && (
+            isApproved(tripId)
+            // pending users may only notify admins about their own access request
+            || (incoming().type == 'access_request' && incoming().target == 'admins'
+                && exists(memberPath(tripId, uid())) && myMember(tripId).status == 'pending')
+          );
+        allow update: if false;
+        allow delete: if isAdmin(tripId);
+      }
+
+      // FCM device tokens: only the owner can see/write them. The notify Edge
+      // Function reads them with a service account.
+      match /pushTokens/{userId} {
+        allow read, delete: if signedIn() && uid() == userId;
+        allow create, update: if signedIn() && uid() == userId && isApproved(tripId)
+          && incoming().keys().hasOnly(['tokens', 'updatedAt']) && strList(incoming().tokens, 10);
+      }
+
+      // ---------- append-only audit history -------------------------------------
+      match /auditLogs/{logId} {
+        allow read: if isAdmin(tripId);
+        allow create: if isApproved(tripId)
+          && incoming().actorUid == uid() && incoming().createdAt == request.time
+          && str(incoming().action, 60) && str(incoming().entity, 60) && str(incoming().summary, 500);
+        allow update, delete: if false;
+      }
+    }
+
+    // Deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

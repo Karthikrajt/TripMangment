@@ -1,0 +1,17 @@
+node_modules
+dist
+dev-dist
+*.local
+.env
+.env.*
+!.env.example
+.firebase
+.firebaserc
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+supabase/.temp
+supabase/.branches
+service-account*.json
+.DS_Store
+coverage
