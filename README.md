@@ -6,6 +6,15 @@ Built with React, TypeScript, Vite, Tailwind CSS, Zustand, Firebase (Auth, Fires
 
 > **Key rule:** every approved member can upload, view and download *all* train tickets for the trip. Only the person who uploaded a ticket (while it is unlocked) or a trip admin can edit or delete it. Firestore Security Rules and the `files` Edge Function enforce this on the server.
 
+Open source under the [MIT License](LICENSE). Contributions welcome.
+
+## Publish your own copy (get a URL)
+
+1. Fork or clone this repository.
+2. Create a free Firebase project and a free Supabase project (see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md), steps 1–3).
+3. In GitHub → Settings → Secrets and variables → Actions, add the secrets listed at the top of `.github/workflows/deploy.yml`, and add the variable `DEPLOY_ENABLED=true`.
+4. Push to `main`. Your app goes live at `https://<your-firebase-project-id>.web.app`.
+
 ## Features
 
 | Area | What you get |
