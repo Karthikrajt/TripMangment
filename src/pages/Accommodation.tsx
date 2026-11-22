@@ -1,7 +1,7 @@
 import { personIdOf } from '../domain/people';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Hotel, Pencil, Plus, Trash2, BedDouble } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAccommodations, useRooms } from '../hooks/data';
 import { useIsAdmin, useSession } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -28,6 +28,17 @@ export default function Accommodation() {
   const me = useSession((s) => s.member);
   const admin = useIsAdmin();
   const [editing, setEditing] = useState<Acc | 'new' | null>(null);
+  const [prefill, setPrefill] = useState<Partial<Acc> | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // "Add to Accommodation" from Hotels & Travel opens the form pre-filled.
+  useEffect(() => {
+    const p = (location.state as { prefill?: Partial<Acc> } | null)?.prefill;
+    if (!p || !admin) return;
+    setPrefill(p);
+    setEditing('new');
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, admin, navigate, location.pathname]);
 
   const remove = async (h: Acc) => {
     if (!(await confirm({ title: 'Delete accommodation?', message: `“${h.name}” will be removed.`, danger: true, confirmLabel: 'Delete' }))) return;
@@ -86,16 +97,17 @@ export default function Accommodation() {
           })}
         </div>
       )}
-      {admin && editing && <AccommodationForm item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {admin && editing && <AccommodationForm item={editing === 'new' ? null : editing} prefill={editing === 'new' ? prefill : null} onClose={() => { setEditing(null); setPrefill(null); }} />}
     </div>
   );
 }
 
-function AccommodationForm({ item, onClose }: { item: Acc | null; onClose: () => void }) {
+function AccommodationForm({ item, prefill, onClose }: { item: Acc | null; prefill?: Partial<Acc> | null; onClose: () => void }) {
+  const p = prefill ?? {};
   const f = useForm({
-    name: item?.name ?? '',
-    address: item?.address ?? '',
-    contactNumber: item?.contactNumber ?? '',
+    name: item?.name ?? p.name ?? '',
+    address: item?.address ?? p.address ?? '',
+    contactNumber: item?.contactNumber ?? p.contactNumber ?? '',
     bookingReference: item?.bookingReference ?? '',
     checkInDate: item?.checkInDate ?? '',
     checkInTime: item?.checkInTime ?? '12:00',
@@ -103,8 +115,8 @@ function AccommodationForm({ item, onClose }: { item: Acc | null; onClose: () =>
     checkOutTime: item?.checkOutTime ?? '11:00',
     numberOfRooms: String(item?.numberOfRooms ?? 1),
     totalCapacity: String(item?.totalCapacity ?? 2),
-    mapsUrl: item?.mapsUrl ?? '',
-    instructions: item?.instructions ?? '',
+    mapsUrl: item?.mapsUrl ?? p.mapsUrl ?? '',
+    instructions: item?.instructions ?? p.instructions ?? '',
   });
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState<string | null>(null);

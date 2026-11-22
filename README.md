@@ -25,6 +25,7 @@ Open source under the [MIT License](LICENSE). Contributions welcome.
 | Itinerary | Day-wise activities, 12-hour times, Google Maps links, coordinator, instructions, draft/publish, change notifications |
 | Train tickets | PDF/JPG/PNG upload, multi-passenger assignment (members plus free-text names), search/filter, preview/download through signed URLs, per-ticket and trip-wide admin lock, explicit "Save for offline" |
 | Stay | Hotels with booking confirmation document, check-in/out, map, call; room allocation with capacity warnings and "your room" |
+| Hotels & Travel | Register of every hotel, resort, homestay, travel agent, bus/taxi operator contacted: contacts, quote, status (shortlisted → booked / not chosen), rating, notes; Call / WhatsApp / Map buttons; a booked stay can be copied into Accommodation |
 | Transport | Multiple vehicles, driver call button, pickup schedule, navigation, member assignment |
 | Expenses | 10 categories, integer paise, per-head split (children by %, infants free) for everyone or selected people, or custom amounts, with exact-sum validation, receipts, admin verification, offline queue with idempotency keys |
 | Settlement | Paid − share balances, minimum-transfer suggestions, separate settlement records (mark paid, date, reference) |

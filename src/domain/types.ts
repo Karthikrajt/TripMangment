@@ -291,3 +291,34 @@ export interface UserProfile {
   createdAt: TS;
   updatedAt: TS;
 }
+
+export const VENDOR_CATEGORIES = ['hotel', 'resort', 'homestay', 'travel_agent', 'bus', 'taxi', 'restaurant', 'activity', 'other'] as const;
+export type VendorCategory = (typeof VENDOR_CATEGORIES)[number];
+export const VENDOR_STATUSES = ['shortlisted', 'enquired', 'quoted', 'booked', 'rejected'] as const;
+export type VendorStatus = (typeof VENDOR_STATUSES)[number];
+
+/** A hotel, resort, travel agent etc. that the group has looked at or contacted. */
+export interface Vendor {
+  id: string;
+  name: string;
+  category: VendorCategory;
+  status: VendorStatus;
+  contactPerson: string;
+  phone: string;
+  altPhone: string;
+  email: string;
+  website: string;
+  location: string;
+  mapsUrl: string;
+  /** quoted price in paise (0 = no quote yet) */
+  quotePaise: Paise;
+  /** what the quote covers, e.g. "per night, 4 rooms, breakfast" */
+  quoteNote: string;
+  /** 0 = not rated, else 1–5 */
+  rating: number;
+  notes: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: TS;
+  updatedAt: TS;
+}
