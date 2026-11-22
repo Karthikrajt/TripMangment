@@ -6,6 +6,7 @@ import { validateFileMeta, FILE_RULES } from '../../supabase/functions/_shared/f
 import { errorMessage } from '../lib/retry';
 import { toast } from './ui/Toast';
 import { formatBytes } from '../lib/format';
+import { viewFile } from './DocViewer';
 
 /** File chooser with immediate client-side validation (server re-validates). */
 export function FileInput({
@@ -76,26 +77,23 @@ export function FileInput({
 }
 
 /** Preview / download buttons backed by short-lived signed URLs. */
-export function FileActions({ path, fileName, compact, offline }: { path: string; fileName: string; compact?: boolean; offline?: { saved: boolean; onSave: () => void; onRemove: () => void; busy?: boolean } }) {
+export function FileActions({ path, fileName, fileType, compact, offline }: { path: string; fileName: string; fileType?: string; compact?: boolean; offline?: { saved: boolean; onSave: () => void; onRemove: () => void; busy?: boolean } }) {
   const [busy, setBusy] = useState<'view' | 'dl' | null>(null);
   if (!path) return null;
   const go = async (inline: boolean) => {
-    setBusy(inline ? 'view' : 'dl');
-    // Open the window synchronously (popup blockers), then point it at the signed URL.
-    const w = inline ? window.open('', '_blank') : null;
+    if (inline) {
+      // Show inside the app instead of opening a new browser page.
+      viewFile(path, fileName, fileType);
+      return;
+    }
+    setBusy('dl');
     try {
-      const url = await getDownloadUrl(path, { fileName, inline });
-      if (w) {
-        w.opener = null;
-        w.location.href = url;
-      } else {
-        const a = document.createElement('a');
-        a.href = url;
-        a.rel = 'noopener';
-        a.click();
-      }
+      const url = await getDownloadUrl(path, { fileName, inline: false });
+      const a = document.createElement('a');
+      a.href = url;
+      a.rel = 'noopener';
+      a.click();
     } catch (e) {
-      w?.close();
       toast.error(errorMessage(e));
     } finally {
       setBusy(null);

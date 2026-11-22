@@ -31,14 +31,15 @@ export async function listOffline(): Promise<OfflineFile[]> {
 }
 
 export function openBlob(file: OfflineFile, download = false) {
-  const url = URL.createObjectURL(file.blob);
-  if (download) {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    a.click();
-  } else {
-    window.open(url, '_blank', 'noopener');
+  if (!download) {
+    // Show inside the app (works offline, no new browser page).
+    void import('../components/DocViewer').then(({ viewBlob }) => viewBlob(file.blob, file.name));
+    return;
   }
+  const url = URL.createObjectURL(file.blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  a.click();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
