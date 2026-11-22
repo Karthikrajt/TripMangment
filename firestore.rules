@@ -202,11 +202,12 @@ service cloud.firestore {
       // uploader (while unlocked) or an admin can edit/delete a ticket.
       match /tickets/{ticketId} {
         function validTicket(d) {
-          return d.keys().hasOnly(['title', 'pnr', 'trainName', 'trainNumber', 'journeyDate', 'boardingStation', 'destinationStation', 'departureTime', 'arrivalTime', 'passengerNames', 'passengerUids', 'coach', 'seats', 'travelClass', 'notes', 'filePath', 'fileName', 'fileType', 'fileSize', 'uploadedBy', 'uploadedByName', 'locked', 'createdAt', 'updatedAt'])
+          return d.keys().hasOnly(['title', 'pnr', 'trainName', 'trainNumber', 'journeyDate', 'boardingStation', 'destinationStation', 'departureTime', 'arrivalTime', 'passengerNames', 'passengerUids', 'passengers', 'coach', 'seats', 'travelClass', 'notes', 'filePath', 'fileName', 'fileType', 'fileSize', 'uploadedBy', 'uploadedByName', 'locked', 'createdAt', 'updatedAt'])
             && str(d.title, 150) && str(d.pnr, 20) && str(d.trainName, 100) && str(d.trainNumber, 10)
             && isDate(d.journeyDate) && isTime(d.departureTime) && isTime(d.arrivalTime)
             && str(d.boardingStation, 100) && str(d.destinationStation, 100)
             && strList(d.passengerNames, 50) && strList(d.passengerUids, 50)
+            && (!('passengers' in d) || strList(d.passengers, 50))
             && str(d.coach, 20) && str(d.seats, 200) && str(d.travelClass, 30) && str(d.notes, 1000)
             && filePathFor(tripId, 'ticket', d.filePath) && d.filePath != ''
             && str(d.fileName, 200) && d.fileType in ['application/pdf', 'image/jpeg', 'image/png']

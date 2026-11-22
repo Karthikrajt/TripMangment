@@ -18,7 +18,7 @@ All trip data lives under `trips/{tripId}` (single trip: `VITE_TRIP_ID`, default
 | `trips/{t}/public/summary` | Name/destination/dates shown on the request screen | any signed-in | admin |
 | `trips/{t}/members/{uid}` | Profile, `role` (admin/member), `status` (pending/approved/rejected/disabled). **Also serves as the access request.** | self, approved | see below |
 | `…/itinerary/{id}` | Day-wise activities (`published` flag) | approved | admin |
-| `…/tickets/{id}` | Ticket details, `passengerUids[]`, `passengerNames[]`, `filePath`, `uploadedBy`, `locked`, timestamps | approved | create: any approved (as self); update/delete: uploader if unlocked and trip not locked, or admin |
+| `…/tickets/{id}` | Ticket details, `passengers[]` (name, age, coach, berth, status per person; max 50), `passengerUids[]`, `passengerNames[]`, `filePath`, `uploadedBy`, `locked`, timestamps | approved | create: any approved (as self); update/delete: uploader if unlocked and trip not locked, or admin |
 | `…/accommodations/{id}` | Hotels, confirmation document path | approved | admin |
 | `…/rooms/{id}` | Room allocation (`memberUids[]`) | approved | admin |
 | `…/transport/{id}` | Vehicles, drivers, pickup, `memberUids[]` | approved | admin |

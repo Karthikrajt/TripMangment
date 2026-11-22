@@ -83,6 +83,25 @@ export interface ItineraryItem {
   updatedAt: TS;
 }
 
+export const BERTH_TYPES = ['', 'LB', 'MB', 'UB', 'SL', 'SU', 'WS', 'MS', 'AS'] as const;
+export type BerthType = (typeof BERTH_TYPES)[number];
+
+/** One passenger line on a ticket, like the IRCTC passenger table. */
+export interface TicketPassenger {
+  /** linked traveller id ('' = not linked, e.g. a guest) */
+  personId: string;
+  name: string;
+  /** 0 = not given */
+  age: number;
+  gender: '' | 'M' | 'F' | 'O';
+  coach: string;
+  /** berth / seat number, e.g. "58" */
+  berth: string;
+  berthType: BerthType;
+  /** booking status as printed: CNF, RAC 12, RLWL 4, GNWL 20, CAN … */
+  status: string;
+}
+
 export interface Ticket {
   id: string;
   title: string;
@@ -96,6 +115,8 @@ export interface Ticket {
   arrivalTime: ClockTime;
   passengerNames: string[];
   passengerUids: string[];
+  /** Per-passenger details. Older tickets don't have this; see domain/ticketPassengers. */
+  passengers?: TicketPassenger[];
   coach: string;
   seats: string;
   travelClass: string;
