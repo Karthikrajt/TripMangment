@@ -1,7 +1,7 @@
 import { personIdOf } from '../domain/people';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive } from 'lucide-react';
+import { ChevronDown, Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive, X } from 'lucide-react';
 import { useTickets } from '../hooks/data';
 import { useApprovedMembers, useIsAdmin, useSession } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -19,13 +19,16 @@ import { canEditTicket } from '../domain/permissions';
 import { createTicket, deleteTicket, setTicketLock, updateTicket, type TicketInput } from '../services/tickets';
 import { uploadFile, filesConfigured } from '../lib/files';
 import { listOffline, openBlob, removeOffline, saveOffline, getOffline } from '../lib/offlineFiles';
-import { formatDate, formatDateTime, formatTime } from '../lib/format';
+import { formatDate, formatDateTime, formatTime, todayIST } from '../lib/format';
+import {
+  applyFilters, dateOptions, EMPTY_FILTERS, hasActiveFilters, isTicketCompleted, matchesTab, pruneSelection, splitByCompletion, trainOptions,
+  type FilterContext, type TicketFilterState,
+} from '../domain/ticketFilters';
 import { errorMessage } from '../lib/retry';
 import { isClockTime, isISODate } from '../domain/validation';
 import { useOnline } from '../hooks/useOnline';
 import type { Ticket } from '../domain/types';
 
-type Filter = 'all' | 'mine' | 'uploaded';
 
 export default function Tickets() {
   const { data, loading, error } = useTickets();
@@ -35,30 +38,49 @@ export default function Tickets() {
   const admin = useIsAdmin();
   const online = useOnline();
   const [params, setParams] = useSearchParams();
-  const [filter, setFilter] = useState<Filter>('all');
-  const [q, setQ] = useState('');
+  const [filters, setFilters] = useState<TicketFilterState>(EMPTY_FILTERS);
+  const setF = (patch: Partial<TicketFilterState>) => setFilters((f) => ({ ...f, ...patch }));
+  const clearFilters = () => setFilters(EMPTY_FILTERS);
   const [editing, setEditing] = useState<Ticket | 'new' | null>(null);
   const [offlineIds, setOfflineIds] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [showCompleted, setShowCompleted] = useState(false);
   const highlight = params.get('open');
+  const today = todayIST();
+
+  const ctx = useMemo<FilterContext>(() => {
+    const names = new Map(members.map((m) => [m.uid, m.displayName]));
+    return { myPersonId: personIdOf(me), myUid: me?.uid ?? '', nameOf: (id) => names.get(id) ?? '' };
+  }, [members, me]);
+
+  // Options reflect the current tab, so counts match what the user can pick from.
+  const inTab = useMemo(() => data.filter((t) => matchesTab(t, filters.tab, ctx)), [data, filters.tab, ctx]);
+  const dates = useMemo(() => dateOptions(inTab), [inTab]);
+  const trains = useMemo(() => trainOptions(inTab), [inTab]);
+  useEffect(() => {
+    if (loading) return;
+    setFilters((f) => pruneSelection(f, dates, trains));
+  }, [dates, trains, loading]);
+
+  const { active, completed } = useMemo(() => splitByCompletion(applyFilters(data, filters, ctx), today), [data, filters, ctx, today]);
+  const filtering = hasActiveFilters(filters);
 
   useEffect(() => {
     listOffline().then((l) => setOfflineIds(new Set(l.map((x) => x.id)))).catch(() => undefined);
   }, []);
+  // ?open=<id>: expand Completed if needed, then scroll to the ticket.
   useEffect(() => {
-    if (highlight && data.length) document.getElementById(`ticket-${highlight}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [highlight, data.length]);
-
-  const shown = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return data.filter((t) => {
-      if (filter === 'mine' && !(me && t.passengerUids.includes(personIdOf(me)))) return false;
-      if (filter === 'uploaded' && t.uploadedBy !== me?.uid) return false;
-      if (!needle) return true;
-      const passengerText = [...t.passengerNames, ...t.passengerUids.map((u) => members.find((m) => m.uid === u)?.displayName ?? '')].join(' ');
-      return `${t.title} ${t.pnr} ${t.trainName} ${t.trainNumber} ${t.boardingStation} ${t.destinationStation} ${passengerText}`.toLowerCase().includes(needle);
-    });
-  }, [data, filter, q, me, members]);
+    if (!highlight || !data.length) return;
+    const t = data.find((x) => x.id === highlight);
+    if (!t) return;
+    if (isTicketCompleted(t, today)) setShowCompleted(true);
+    const timer = setTimeout(() => document.getElementById(`ticket-${highlight}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
+    return () => clearTimeout(timer);
+  }, [highlight, data, today]);
+  // Make sure the highlighted ticket isn't hidden by a filter.
+  useEffect(() => {
+    if (highlight) setFilters(EMPTY_FILTERS);
+  }, [highlight]);
 
   const remove = async (t: Ticket) => {
     if (!(await confirm({ title: 'Delete ticket?', message: `“${t.title}” (PNR ${t.pnr || '—'}) and its document will be permanently deleted for everyone.`, danger: true, confirmLabel: 'Delete' }))) return;
@@ -106,40 +128,7 @@ export default function Tickets() {
     if (f) openBlob(f);
   };
 
-  return (
-    <div>
-      <PageHeader
-        title={admin ? 'Ticket Management' : 'Train Tickets'}
-        subtitle="All tickets for the trip. Everyone can view and download; upload tickets for anyone."
-        syncKey="tickets"
-        actions={<Button icon={<Plus className="size-5" />} onClick={() => setEditing('new')} disabled={!online || !filesConfigured}>Upload ticket</Button>}
-      />
-      {!filesConfigured && <div className="mb-4"><Notice tone="warn">File storage is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</Notice></div>}
-      {trip?.ticketsLocked && !admin && <div className="mb-4"><Notice tone="info"><Lock className="mr-1 inline size-4" /> The admin has locked tickets. You can still view, download and upload, but not edit or delete.</Notice></div>}
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="flex rounded-xl bg-slate-100 p-1" role="tablist">
-          {([['all', 'All tickets'], ['mine', 'My tickets'], ['uploaded', 'Uploaded by me']] as const).map(([k, label]) => (
-            <button key={k} role="tab" aria-selected={filter === k} onClick={() => setFilter(k)} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold sm:flex-none ${filter === k ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-600'}`}>
-              {label}
-            </button>
-          ))}
-        </div>
-        <label className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search PNR, train, passenger…" className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3" aria-label="Search tickets" />
-        </label>
-      </div>
-
-      {loading ? (
-        <Spinner />
-      ) : error ? (
-        <ErrorState message={error} />
-      ) : shown.length === 0 ? (
-        <EmptyState icon={<TicketIcon className="size-7" />} title={data.length ? 'No matching tickets' : 'No tickets uploaded yet'} message={data.length ? 'Try a different filter or search.' : 'Upload the first train ticket (PDF or photo) for the group.'} action={!data.length && <Button onClick={() => setEditing('new')} icon={<Plus className="size-5" />}>Upload ticket</Button>} />
-      ) : (
-        <ul className="grid gap-4 md:grid-cols-2">
-          {shown.map((t) => {
+  const renderCard = (t: Ticket, completed: boolean) => {
             const editable = canEditTicket(me, t) && (admin || !trip?.ticketsLocked);
             const savedOffline = offlineIds.has(t.id);
             return (
@@ -152,6 +141,7 @@ export default function Tickets() {
                   <div className="flex flex-col items-end gap-1">
                     {t.pnr && <span className="rounded-lg bg-white px-2 py-1 font-mono text-sm font-bold tracking-wider text-brand-800">PNR {t.pnr}</span>}
                     {t.locked && <Badge tone="amber"><Lock className="size-3" /> Locked</Badge>}
+                    {completed && <Badge>Completed</Badge>}
                     {savedOffline && <Badge tone="green"><HardDrive className="size-3" /> Offline</Badge>}
                   </div>
                 </div>
@@ -203,8 +193,80 @@ export default function Tickets() {
                 </div>
               </Card>
             );
-          })}
-        </ul>
+  };
+
+  return (
+    <div>
+      <PageHeader
+        title={admin ? 'Ticket Management' : 'Train Tickets'}
+        subtitle="All tickets for the trip. Everyone can view and download; upload tickets for anyone."
+        syncKey="tickets"
+        actions={<Button icon={<Plus className="size-5" />} onClick={() => setEditing('new')} disabled={!online || !filesConfigured}>Upload ticket</Button>}
+      />
+      {!filesConfigured && <div className="mb-4"><Notice tone="warn">File storage is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.</Notice></div>}
+      {trip?.ticketsLocked && !admin && <div className="mb-4"><Notice tone="info"><Lock className="mr-1 inline size-4" /> The admin has locked tickets. You can still view, download and upload, but not edit or delete.</Notice></div>}
+
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Whose tickets">
+          {([['all', 'All tickets'], ['mine', 'My tickets'], ['uploaded', 'Uploaded by me']] as const).map(([k, label]) => (
+            <button key={k} role="tab" aria-selected={filters.tab === k} onClick={() => setF({ tab: k })} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold sm:flex-none ${filters.tab === k ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-600'}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="relative flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
+          <input type="search" value={filters.q} onChange={(e) => setF({ q: e.target.value })} placeholder="Search PNR, train, passenger, date…" className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3" aria-label="Search tickets" />
+        </label>
+      </div>
+      <div className="mb-5 grid grid-cols-2 items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+        <SelectField label="Journey date" value={filters.date} onChange={(e) => setF({ date: e.target.value })}>
+          <option value="">All dates</option>
+          {dates.map((o) => <option key={o.value} value={o.value}>{o.label} ({o.count})</option>)}
+        </SelectField>
+        <SelectField label="Train" value={filters.train} onChange={(e) => setF({ train: e.target.value })}>
+          <option value="">All trains</option>
+          {trains.map((o) => <option key={o.value} value={o.value}>{o.label} ({o.count})</option>)}
+        </SelectField>
+        <Button variant="secondary" className="col-span-2 sm:col-span-1" icon={<X className="size-4" />} onClick={clearFilters} disabled={!filtering}>
+          Clear filters
+        </Button>
+      </div>
+
+      {loading ? (
+        <Spinner />
+      ) : error ? (
+        <ErrorState message={error} />
+      ) : data.length === 0 ? (
+        <EmptyState icon={<TicketIcon className="size-7" />} title="No tickets uploaded yet" message="Upload the first train ticket (PDF or photo) for the group." action={<Button onClick={() => setEditing('new')} icon={<Plus className="size-5" />}>Upload ticket</Button>} />
+      ) : (
+        <div className="space-y-6">
+          {active.length > 0 ? (
+            <ul className="grid gap-4 md:grid-cols-2">{active.map((t) => renderCard(t, false))}</ul>
+          ) : filtering ? (
+            <EmptyState icon={<TicketIcon className="size-7" />} title="No matching upcoming tickets" message={completed.length ? 'Some completed tickets match – see below.' : 'Try a different filter or search.'} action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
+          ) : (
+            <EmptyState icon={<TicketIcon className="size-7" />} title="No upcoming journeys" message="All tickets are completed. You can still open them below." />
+          )}
+
+          {completed.length > 0 && (
+            <section>
+              <button
+                type="button"
+                aria-expanded={showCompleted}
+                aria-controls="completed-tickets"
+                onClick={() => setShowCompleted((v) => !v)}
+                className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                <span>Completed ({completed.length})</span>
+                <ChevronDown className={`size-5 transition-transform ${showCompleted ? 'rotate-180' : ''}`} aria-hidden />
+              </button>
+              {showCompleted && (
+                <ul id="completed-tickets" className="mt-4 grid gap-4 md:grid-cols-2">{completed.map((t) => renderCard(t, true))}</ul>
+              )}
+            </section>
+          )}
+        </div>
       )}
       {editing && (
         <TicketForm
