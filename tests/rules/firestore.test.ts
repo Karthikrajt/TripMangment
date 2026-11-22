@@ -254,6 +254,36 @@ describe('expenses', () => {
   });
 });
 
+describe('hotels & travel register', () => {
+  const vendor = (createdBy: string, extra: Record<string, unknown> = {}) => ({
+    name: 'Sample Resort', category: 'resort', status: 'enquired', contactPerson: '', phone: '9876543210', altPhone: '', email: '',
+    website: '', location: 'Sample Town', mapsUrl: '', quotePaise: 450000, quoteNote: 'per night', rating: 0, notes: '',
+    createdBy, createdByName: createdBy, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra,
+  });
+  it('approved members can add and read; pending users cannot', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('alice')));
+    await assertSucceeds(getDoc(doc(db('bob'), `trips/${T}/vendors/v1`)));
+    await assertFails(getDoc(doc(db('pete'), `trips/${T}/vendors/v1`)));
+    await assertFails(setDoc(doc(db('pete'), `trips/${T}/vendors/v2`), vendor('pete')));
+  });
+  it('cannot add as someone else or with bad values', async () => {
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('bob')));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('alice', { category: 'spaceship' })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('alice', { quotePaise: 10.5 })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('alice', { rating: 9 })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('alice', { name: '' })));
+  });
+  it('only the creator or an admin can edit or delete', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/vendors/v1`), vendor('alice')));
+    await assertFails(updateDoc(doc(db('bob'), `trips/${T}/vendors/v1`), { status: 'booked' }));
+    await assertFails(deleteDoc(doc(db('bob'), `trips/${T}/vendors/v1`)));
+    await assertSucceeds(updateDoc(doc(db('alice'), `trips/${T}/vendors/v1`), { status: 'quoted' }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/vendors/v1`), { createdBy: 'bob' }));
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/vendors/v1`), { status: 'booked' }));
+    await assertSucceeds(deleteDoc(doc(db('alice'), `trips/${T}/vendors/v1`)));
+  });
+});
+
 describe('chat & notifications', () => {
   it('approved members can post as themselves only', async () => {
     const msg = { senderUid: 'alice', senderName: 'A', senderPhoto: '', text: 'hi', kind: 'text', filePath: '', fileName: '', fileType: '', createdAt: serverTimestamp() };

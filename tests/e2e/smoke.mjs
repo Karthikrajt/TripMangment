@@ -261,6 +261,44 @@ try {
   await admin.getByRole('dialog', { name: 'Move Kavin (kid) to…' }).getByRole('button', { name: 'No family' }).click();
   await famCard('People without a family').getByText('Kavin (kid)').waitFor();
   ok('Move to "No family" puts the person back in the unassigned list');
+
+  // 13. Hotels & Travel register (made-up names)
+  await alice.goto(`${BASE}/vendors`);
+  await alice.getByRole('button', { name: 'Add the first one' }).click();
+  await alice.getByLabel(/^Name/).fill('Sample Lake Resort');
+  await alice.getByLabel('Type', { exact: true }).selectOption('resort');
+  await alice.getByLabel('Status', { exact: true }).selectOption('quoted');
+  await alice.getByLabel('Quote (₹)').fill('4500');
+  await alice.getByLabel('What the quote covers').fill('per night, breakfast');
+  await alice.getByLabel('Phone / WhatsApp').fill('98765 43210');
+  await alice.getByLabel('Place / address').fill('Sample Town');
+  await alice.getByRole('button', { name: 'Save' }).click();
+  await alice.getByText('Sample Lake Resort').waitFor();
+  const wa = await alice.getByRole('link', { name: 'WhatsApp' }).getAttribute('href');
+  if (wa !== 'https://wa.me/919876543210') throw new Error('unexpected WhatsApp link ' + wa);
+  await shot(alice, 'vendors-mobile');
+  ok('Member added a resort with a quote; Call and WhatsApp buttons use +91');
+
+  await admin.goto(`${BASE}/vendors`);
+  await admin.getByRole('button', { name: 'Add record' }).click();
+  await admin.getByLabel(/^Name/).fill('Sample Travels');
+  await admin.getByLabel('Type', { exact: true }).selectOption('travel_agent');
+  await admin.getByRole('button', { name: 'Save' }).click();
+  await admin.getByText('Sample Travels').waitFor();
+  await alice.getByText('Sample Travels').waitFor();
+  if (await alice.getByRole('button', { name: 'Delete Sample Travels' }).count()) throw new Error('member can delete admin record');
+  ok("Members see everyone's records but can only edit their own");
+
+  await admin.getByLabel('Status of Sample Lake Resort').selectOption('booked');
+  await admin.getByRole('button', { name: 'Add to Accommodation' }).click();
+  await admin.getByRole('dialog', { name: 'Add accommodation' }).waitFor();
+  if ((await admin.getByLabel('Hotel / resort name').inputValue()) !== 'Sample Lake Resort') throw new Error('accommodation not prefilled');
+  await admin.getByLabel('Check-in date').fill('2026-12-20');
+  await admin.getByLabel('Check-out date').fill('2026-12-22');
+  await admin.getByRole('button', { name: 'Save' }).click();
+  await admin.getByRole('heading', { name: 'Sample Lake Resort' }).waitFor();
+  await shot(admin, 'vendors-to-accommodation');
+  ok('Booked resort → "Add to Accommodation" opens a pre-filled hotel form');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

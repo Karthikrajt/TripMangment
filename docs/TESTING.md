@@ -50,6 +50,7 @@
 - [ ] Double-tapping Submit creates one record
 
 ### Other modules
+- [ ] Hotels & Travel: a member adds a record with a quote; Call and WhatsApp buttons open the right number (10-digit numbers get +91); only the creator or an admin can edit/delete; status filter and search work; a booked hotel → "Add to Accommodation" opens a pre-filled form
 - [ ] Itinerary: draft hidden from members, publish notifies, "Now" highlight during an activity, Directions opens Google Maps
 - [ ] Hotel: confirmation document downloads, call and map buttons work
 - [ ] Rooms: the "Your room" banner appears and over-capacity is flagged

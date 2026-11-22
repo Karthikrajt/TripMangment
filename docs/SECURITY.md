@@ -23,6 +23,7 @@ All trip data lives under `trips/{tripId}` (single trip: `VITE_TRIP_ID`, default
 | `…/rooms/{id}` | Room allocation (`memberUids[]`) | approved | admin |
 | `…/transport/{id}` | Vehicles, drivers, pickup, `memberUids[]` | approved | admin |
 | `…/expenses/{idempotencyKey}` | `amountPaise` (int), `splits{uid: paise}`, `status` | approved | see below |
+| `…/vendors/{id}` | Hotels & Travel register: name, type, status, contacts, quote (paise), rating, notes | approved | create: any approved (as self); update/delete: creator or admin |
 | `…/settlements/{id}` | Settlement records (separate from expenses) | approved | admin |
 | `…/messages/{id}` | Group chat | approved | create as self; delete own (admin: any); no edits |
 | `…/announcements/{id}` | Admin announcements | approved | admin |

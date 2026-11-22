@@ -284,6 +284,29 @@ service cloud.firestore {
         allow delete: if isAdmin(tripId);
       }
 
+      // ---------- hotels, resorts & travel contacts (enquiry register) -----------
+      // Any approved member can add; the person who added it or an admin can
+      // edit/delete. Everyone approved can read.
+      match /vendors/{vendorId} {
+        function validVendor(d) {
+          return d.keys().hasOnly(['name', 'category', 'status', 'contactPerson', 'phone', 'altPhone', 'email', 'website', 'location', 'mapsUrl', 'quotePaise', 'quoteNote', 'rating', 'notes', 'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+            && str(d.name, 150) && d.name.size() > 0
+            && d.category in ['hotel', 'resort', 'homestay', 'travel_agent', 'bus', 'taxi', 'restaurant', 'activity', 'other']
+            && d.status in ['shortlisted', 'enquired', 'quoted', 'booked', 'rejected']
+            && str(d.contactPerson, 100) && str(d.phone, 30) && str(d.altPhone, 30) && str(d.email, 200)
+            && str(d.website, 500) && str(d.location, 300) && str(d.mapsUrl, 1000)
+            && d.quotePaise is int && d.quotePaise >= 0 && d.quotePaise <= 10000000000
+            && str(d.quoteNote, 300) && d.rating is int && d.rating >= 0 && d.rating <= 5
+            && str(d.notes, 3000) && str(d.createdByName, 100);
+        }
+        allow read: if isApproved(tripId);
+        allow create: if isApproved(tripId) && validVendor(incoming())
+          && incoming().createdBy == uid() && incoming().createdAt == request.time;
+        allow update: if validVendor(incoming()) && unchanged(['createdBy', 'createdByName', 'createdAt'])
+          && (isAdmin(tripId) || (isApproved(tripId) && existing().createdBy == uid()));
+        allow delete: if isAdmin(tripId) || (isApproved(tripId) && existing().createdBy == uid());
+      }
+
       // ---------- group chat ---------------------------------------------------
       match /messages/{messageId} {
         allow read: if isApproved(tripId);

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useLiveQuery, asType } from './useLive';
 import { tripCol } from '../services/base';
 import { useSession } from '../store/session';
-import type { Accommodation, Announcement, AuditLog, Expense, ItineraryItem, Room, Settlement, Ticket, Vehicle } from '../domain/types';
+import type { Accommodation, Announcement, AuditLog, Expense, ItineraryItem, Room, Settlement, Ticket, Vehicle, Vendor } from '../domain/types';
 import { isAdmin } from '../domain/permissions';
 
 const useApproved = () => useSession((s) => s.member?.status === 'approved');
@@ -37,6 +37,7 @@ export const useRooms = () => useCol<Room>('rooms', byName);
 export const useTransport = () => useCol<Vehicle>('transport', byPickup);
 export const useExpenses = () => useCol<Expense>('expenses', byExpenseDate);
 export const useSettlements = () => useCol<Settlement>('settlements', byCreated);
+export const useVendors = () => useCol<Vendor>('vendors');
 
 export function useAnnouncements(max = 20) {
   const approved = useApproved();

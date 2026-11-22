@@ -1,6 +1,6 @@
 import {
   Bell, BedDouble, Bus, CalendarDays, ClipboardCheck, FileClock, Hotel, Home, LayoutDashboard, Megaphone, MessagesSquare,
-  Radio, Receipt, Scale, Settings, Ticket, User, UserCheck, Users, BarChart3,
+  Radio, Receipt, Scale, Settings, Ticket, User, UserCheck, Users, BarChart3, Contact,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -26,6 +26,7 @@ export const memberNav: NavGroup[] = [
       { to: '/accommodation', label: 'Accommodation', icon: Hotel },
       { to: '/rooms', label: 'Room Allocation', icon: BedDouble },
       { to: '/transport', label: 'Transport', icon: Bus },
+      { to: '/vendors', label: 'Hotels & Travel', icon: Contact },
     ],
   },
   {
@@ -66,6 +67,7 @@ export const adminNav: NavGroup[] = [
       { to: '/accommodation', label: 'Accommodation', icon: Hotel },
       { to: '/rooms', label: 'Room Allocation', icon: BedDouble },
       { to: '/transport', label: 'Transport Management', icon: Bus },
+      { to: '/vendors', label: 'Hotels & Travel', icon: Contact },
     ],
   },
   {
