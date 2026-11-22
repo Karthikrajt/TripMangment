@@ -5,7 +5,8 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Avatar } from '../../components/ui/Avatar';
-import { Badge, EmptyState } from '../../components/ui/Feedback';
+import { Badge, EmptyState, Notice } from '../../components/ui/Feedback';
+import { Link } from 'react-router-dom';
 import { SelectField } from '../../components/ui/Field';
 import { toast } from '../../components/ui/Toast';
 import { decideMember } from '../../services/members';
@@ -15,7 +16,7 @@ import { errorMessage } from '../../lib/retry';
 import type { Member, MemberStatus } from '../../domain/types';
 
 export default function Approvals() {
-  const { members, member: me } = useSession();
+  const { members, member: me, trip } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
   const shareDefaults = useShareDefaults();
   const [linkChoice, setLinkChoice] = useState<Record<string, string>>({});
@@ -49,6 +50,9 @@ export default function Approvals() {
   return (
     <div className="space-y-6">
       <PageHeader title="Member Approvals" subtitle="People who signed in and asked to join. Only approved accounts can see trip information." />
+      {trip?.openJoin !== false && (
+        <Notice>New people join automatically and confirm which traveller they are. To approve each person yourself, turn off “Anyone with the app link can join” in <Link className="font-semibold underline" to="/admin/settings">Trip Settings</Link>.</Notice>
+      )}
       {pending.length === 0 ? (
         <EmptyState icon={<UserCheck className="size-7" />} title="No pending requests" message="When someone signs in and asks to join, they will appear here." />
       ) : (

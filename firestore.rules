@@ -79,7 +79,8 @@ service cloud.firestore {
         && isDate(incoming().startDate) && isDate(incoming().endDate)
         && strList(incoming().importantContacts, 30)
         && incoming().ticketsLocked is bool
-        && pct(incoming(), 'childSharePercent') && pct(incoming(), 'infantSharePercent');
+        && pct(incoming(), 'childSharePercent') && pct(incoming(), 'infantSharePercent')
+        && (!('openJoin' in incoming()) || incoming().openJoin is bool);
       allow delete: if false;
 
       // Minimal public summary so signed-in, not-yet-approved users can see
@@ -93,9 +94,12 @@ service cloud.firestore {
       // ---------- members & access requests ---------------------------------
       match /members/{memberId} {
         function isSelf() { return signedIn() && uid() == memberId; }
-        function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'updatedAt']; }
+        function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'linkDecided', 'updatedAt']; }
+        // Trip setting: anyone who signs in joins without admin approval (default on).
+        function openJoin() { return exists(tripPath(tripId)) && trip(tripId).get('openJoin', true) == true; }
+        function travellerPath(id) { return memberPath(tripId, id); }
         function validMember(d) {
-          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'customShare', 'hasLogin', 'personId', 'linkedUid'])
+          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'customShare', 'hasLogin', 'personId', 'linkedUid', 'linkDecided'])
             && d.uid == memberId
             && str(d.displayName, 100) && str(d.email, 200) && str(d.photoURL, 1000)
             && str(d.phone, 30) && str(d.emergencyContact, 200) && str(d.relationship, 100)
@@ -107,7 +111,8 @@ service cloud.firestore {
             && (!('customShare' in d) || d.customShare is bool)
             && (!('hasLogin' in d) || d.hasLogin is bool)
             && (!('personId' in d) || str(d.personId, 128))
-            && (!('linkedUid' in d) || str(d.linkedUid, 128));
+            && (!('linkedUid' in d) || str(d.linkedUid, 128))
+            && (!('linkDecided' in d) || d.linkDecided is bool);
         }
         // Fields only an admin may set on a sign-in account.
         function noAdminFields(d) {
@@ -127,6 +132,9 @@ service cloud.firestore {
           && incoming().email == request.auth.token.email
           && (
             (incoming().status == 'pending' && incoming().role == 'member' && incoming().requestedAt == request.time && incoming().decidedBy == '')
+            // Open trip: join straight away as a regular member.
+            || (incoming().status == 'approved' && incoming().role == 'member' && openJoin()
+                && incoming().requestedAt == request.time && incoming().decidedBy == '')
             || (incoming().status == 'approved' && incoming().role == 'admin'
                 && existsAfter(tripPath(tripId)) && getAfter(tripPath(tripId)).data.ownerUid == uid())
           ))
@@ -140,6 +148,21 @@ service cloud.firestore {
           (isAdmin(tripId) && (!isOwnerTarget() || unchanged(['role', 'status']) || isSelf()))
           // Self: profile fields only.
           || (isSelf() && changed().hasOnly(profileKeys()))
+          // Self (open trip): a pending or previously rejected user joins. Disabled users stay out.
+          || (isSelf() && openJoin() && existing().status in ['pending', 'rejected'] && incoming().status == 'approved'
+              && incoming().role == 'member' && changed().hasOnly(profileKeys().concat(['status', 'requestNote', 'requestedAt'])))
+          // Self: "this traveller is me" – claim an unclaimed traveller, in the
+          // same batch that sets the traveller's linkedUid to this account.
+          || (isSelf() && isApproved(tripId) && existing().get('personId', '') == '' && incoming().personId != ''
+              && changed().hasOnly(['personId', 'linkDecided', 'updatedAt'])
+              && get(travellerPath(incoming().personId)).data.get('hasLogin', true) == false
+              && get(travellerPath(incoming().personId)).data.get('linkedUid', '') == ''
+              && getAfter(travellerPath(incoming().personId)).data.linkedUid == uid())
+          // Traveller side of the claim above (only an unclaimed, no-login traveller).
+          || (!isSelf() && isApproved(tripId) && existing().get('hasLogin', true) == false
+              && existing().get('linkedUid', '') == '' && incoming().linkedUid == uid()
+              && changed().hasOnly(['linkedUid', 'updatedAt'])
+              && getAfter(memberPath(tripId, uid())).data.personId == memberId)
           // Self: re-request access after a rejection.
           || (isSelf() && existing().status == 'rejected' && incoming().status == 'pending'
               && incoming().role == 'member' && incoming().requestedAt == request.time

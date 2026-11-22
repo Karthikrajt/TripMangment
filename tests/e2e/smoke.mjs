@@ -48,6 +48,13 @@ try {
   await admin.getByText('Admin dashboard', { exact: true }).waitFor();
   ok('Bootstrap admin created the trip and sees the admin dashboard');
 
+  // 1b. Turn off "anyone can join" so the approval flow can be tested first
+  await admin.goto(`${BASE}/admin/settings`);
+  await admin.getByLabel(/Anyone with the app link can join/).uncheck();
+  await admin.getByRole('button', { name: 'Save changes' }).click();
+  await admin.getByText('Trip settings saved').waitFor();
+  ok('Admin can require approval for new people (Trip Settings switch)');
+
   // 2. A new user requests access
   const alice = await user('alice@gmail.com', 'Alice Kumar', true);
   await alice.getByRole('heading', { name: 'Request to join' }).waitFor();
@@ -84,6 +91,16 @@ try {
   await admin.getByText('Infant · not counted').waitFor();
   await shot(admin, 'members-people');
   ok('Admin added a child (50%), an infant and an adult without them signing in');
+
+  // 3c. Alice is asked which traveller she is; she's not on the list → joins her family
+  await alice.goto(BASE);
+  const who = alice.getByRole('dialog', { name: 'Which traveller are you?' });
+  await who.waitFor();
+  await who.getByRole('button', { name: /not on the list/ }).click();
+  await alice.getByRole('dialog', { name: 'Welcome to the trip' }).getByLabel('Family').selectOption('Kumar family');
+  await alice.getByRole('button', { name: 'Done' }).click();
+  await who.waitFor({ state: 'detached' });
+  ok('Member asked "Which traveller are you?" → not on the list → stays as new member in their family');
 
   // 4. Admin adds an itinerary item, member sees it
   await admin.goto(`${BASE}/itinerary`);
@@ -382,6 +399,33 @@ try {
   await viewer.waitFor({ state: 'detached' });
   if (!admin.url().endsWith('/profile')) throw new Error('Back should close the viewer, not leave the page');
   ok('Documents open inside the app (PDF drawn in-app, zoom, Back closes the viewer); offline copy button shows offline');
+
+  // 16. Open joining (default): no admin approval; name match → "Are you …?"
+  await admin.goto(`${BASE}/admin/settings`);
+  await admin.getByLabel(/Anyone with the app link can join/).check();
+  await admin.getByRole('button', { name: 'Save changes' }).click();
+  await admin.getByText('Trip settings saved').waitFor();
+  const kavin = await user('kavin@gmail.com', 'Kavin', true);
+  const ask = kavin.getByRole('dialog', { name: 'Which traveller are you?' });
+  await ask.getByText('Are you Kavin (kid)?').waitFor({ timeout: 20000 });
+  await shot(kavin, 'who-are-you');
+  await ask.getByRole('button', { name: /Yes, that/ }).click();
+  await ask.waitFor({ state: 'detached' });
+  await kavin.goto(`${BASE}/profile`);
+  await kavin.getByText('You are Kavin (kid)').waitFor();
+  ok('New user joins without approval; "Are you Kavin (kid)?" → Yes connects them');
+
+  const newbie = await user('newcomer@gmail.com', 'Newcomer Person', true);
+  const ask2 = newbie.getByRole('dialog', { name: 'Which traveller are you?' });
+  await ask2.getByText('Find your name').waitFor({ timeout: 20000 });
+  await ask2.getByRole('button', { name: /not on the list/ }).click();
+  await newbie.getByLabel('Family').selectOption('Sample Family');
+  await newbie.getByRole('button', { name: 'Done' }).click();
+  await newbie.getByRole('dialog').waitFor({ state: 'detached' });
+  await admin.goto(`${BASE}/members`);
+  await admin.getByRole('tab', { name: 'People' }).click();
+  await admin.getByRole('heading', { name: 'Sample Family', exact: true }).locator('xpath=../..').getByText('Newcomer Person').waitFor();
+  ok('No match → "I\'m not on the list" → added as a new member in the chosen family');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

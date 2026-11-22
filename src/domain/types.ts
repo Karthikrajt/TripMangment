@@ -29,6 +29,8 @@ export interface Trip {
   /** Default share for children / infants, percent of an adult (adult is always 100). */
   childSharePercent?: number;
   infantSharePercent?: number;
+  /** Anyone who signs in joins without admin approval (default true). */
+  openJoin?: boolean;
   createdAt: TS;
   updatedAt: TS;
 }
@@ -63,6 +65,8 @@ export interface Member {
   personId?: string;
   /** On a traveller: the sign-in account linked to it. */
   linkedUid?: string;
+  /** On a sign-in account: the person has answered "which traveller are you?". */
+  linkDecided?: boolean;
 }
 
 export interface ItineraryItem {
@@ -276,7 +280,8 @@ export type NotificationType =
   | 'expense_reviewed'
   | 'chat_message'
   | 'announcement'
-  | 'settlement_updated';
+  | 'settlement_updated'
+  | 'member_joined';
 
 export interface AppNotification {
   id: string;

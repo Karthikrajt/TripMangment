@@ -167,3 +167,43 @@ export async function moveToFamily(people: Member[], family: string) {
   await logAudit('update', 'family', name || '(none)', `${name ? `Added to “${name}”` : 'Removed from their family'}: ${who}`.slice(0, 500));
   return changing.length;
 }
+
+/** Open trip: join straight away (no admin approval). Admins are told who joined. */
+export async function joinTrip(user: User, existing: Member | null) {
+  const name = user.displayName ?? user.email ?? 'Guest';
+  if (existing) {
+    await updateDoc(ref(user.uid), { status: 'approved', requestedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  } else {
+    await setDoc(ref(user.uid), {
+      uid: user.uid,
+      displayName: name.slice(0, 100),
+      email: user.email ?? '',
+      photoURL: user.photoURL ?? '',
+      phone: '',
+      emergencyContact: '',
+      relationship: '',
+      role: 'member',
+      status: 'approved',
+      requestNote: '',
+      requestedAt: serverTimestamp(),
+      decidedAt: null,
+      decidedBy: '',
+      updatedAt: serverTimestamp(),
+    });
+  }
+  await notify({ type: 'member_joined', title: 'New member joined', body: `${name} joined the trip.`, link: '/members', target: 'admins' });
+}
+
+/** "This traveller is me": connect my sign-in account to a traveller the admin added. */
+export async function claimTraveller(me: Member, traveller: Member) {
+  const b = writeBatch(db);
+  b.update(ref(me.uid), { personId: traveller.uid, linkDecided: true, updatedAt: serverTimestamp() });
+  b.update(ref(traveller.uid), { linkedUid: me.uid, updatedAt: serverTimestamp() });
+  await b.commit();
+  await logAudit('link', 'member', me.uid, `${me.displayName} confirmed they are ${traveller.displayName}`);
+}
+
+/** "I'm not on the list": stay as a new person, optionally in a family. */
+export async function confirmNewPerson(me: Member, family: string) {
+  await updateDoc(ref(me.uid), { relationship: family.trim().replace(/\s+/g, ' ').slice(0, 100), linkDecided: true, updatedAt: serverTimestamp() });
+}
