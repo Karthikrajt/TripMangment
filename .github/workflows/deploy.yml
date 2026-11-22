@@ -1,14 +1,12 @@
-# Deploys to Firebase Hosting on every push to main.
-# Needs repository secrets (Settings → Secrets and variables → Actions):
-#   FIREBASE_SERVICE_ACCOUNT  – JSON key of a service account with "Firebase Hosting Admin"
-#                               and "Firebase Rules Admin" roles
-#   VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID,
-#   VITE_FIREBASE_STORAGE_BUCKET, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID,
-#   VITE_FIREBASE_VAPID_KEY (optional), VITE_BOOTSTRAP_ADMIN_EMAIL,
-#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
-#   SUPABASE_ACCESS_TOKEN     – personal access token (supabase.com → Account → Access Tokens)
-#   SUPABASE_PROJECT_REF      – the project's reference id
-# The live URL is https://<VITE_FIREBASE_PROJECT_ID>.web.app
+# Publishes the app on every push to main (or manually: Actions → Deploy → Run workflow).
+#
+# Setup:
+#   1. Fill in the TODO values in .env.production (public settings, safe to commit).
+#   2. GitHub → Settings → Secrets and variables → Actions → Secrets:
+#        FIREBASE_SERVICE_ACCOUNT  – contents of the Firebase service-account .json
+#        SUPABASE_ACCESS_TOKEN     – supabase.com → Account → Access Tokens
+#   3. Same page → Variables:  DEPLOY_ENABLED = true
+# Live URL: https://<VITE_FIREBASE_PROJECT_ID>.web.app
 name: Deploy
 on:
   push:
@@ -24,38 +22,40 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
+
+      - name: Read settings from .env.production
+        run: |
+          if grep -q '=TODO' .env.production; then
+            echo "::error::.env.production still has TODO values – fill them in first."; exit 1
+          fi
+          grep -E '^(VITE_FIREBASE_PROJECT_ID|VITE_BOOTSTRAP_ADMIN_EMAIL|SUPABASE_PROJECT_REF)=' .env.production >> "$GITHUB_ENV"
+
       - run: npm ci
       - run: npm test
-      - name: Point rules at the bootstrap admin
-        run: sed -i "s/'you@gmail.com'/'${{ secrets.VITE_BOOTSTRAP_ADMIN_EMAIL }}'/" firestore.rules
-      - run: npm run build
+
+      - name: Set the bootstrap admin in Firestore rules
+        run: sed -i "s/'you@gmail.com'/'${VITE_BOOTSTRAP_ADMIN_EMAIL}'/" firestore.rules
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy Firebase Hosting + Firestore rules
         env:
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
-          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
-          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
-          VITE_FIREBASE_VAPID_KEY: ${{ secrets.VITE_FIREBASE_VAPID_KEY }}
-          VITE_BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.VITE_BOOTSTRAP_ADMIN_EMAIL }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          VITE_TRIP_ID: main
-      - name: Deploy hosting + Firestore rules
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
-          echo "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$RUNNER_TEMP/sa.json"
+          echo "$SA_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-          npx firebase deploy --only hosting,firestore:rules,firestore:indexes --project "${{ secrets.VITE_FIREBASE_PROJECT_ID }}" --non-interactive
+          npx firebase deploy --only hosting,firestore:rules,firestore:indexes --project "$VITE_FIREBASE_PROJECT_ID" --non-interactive
+
       - name: Deploy Supabase Edge Functions
         if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
         run: |
-          P="${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
-          npx -y supabase@2 secrets set --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}" \
+          P="$VITE_FIREBASE_PROJECT_ID"
+          npx -y supabase@2 secrets set --project-ref "$SUPABASE_PROJECT_REF" \
             FIREBASE_PROJECT_ID="$P" TRIP_ID=main APP_URL="https://$P.web.app" \
             ALLOWED_ORIGINS="https://$P.web.app,https://$P.firebaseapp.com,http://localhost:5173"
-          npx -y supabase@2 functions deploy files --no-verify-jwt --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-          npx -y supabase@2 functions deploy notify --no-verify-jwt --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          npx -y supabase@2 functions deploy files --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
+          npx -y supabase@2 functions deploy notify --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
+
       - name: Live URL
-        run: echo "App is live at https://${{ secrets.VITE_FIREBASE_PROJECT_ID }}.web.app" >> "$GITHUB_STEP_SUMMARY"
+        run: echo "### ✅ App is live at https://${VITE_FIREBASE_PROJECT_ID}.web.app" >> "$GITHUB_STEP_SUMMARY"
