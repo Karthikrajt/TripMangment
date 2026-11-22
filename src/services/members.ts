@@ -154,3 +154,11 @@ export async function renameFamily(from: string, to: string, members: Member[]) 
   await b.commit();
   await logAudit('update', 'family', target, `Renamed family “${from}” to “${target}” (${affected.length} people)`);
 }
+
+/** Move one person to a family ('' = no family). Used by the drag-and-drop board. */
+export async function setFamily(m: Member, family: string) {
+  const name = family.trim().replace(/\s+/g, ' ').slice(0, 100);
+  if (familyOf(m) === name) return;
+  await updateDoc(ref(m.uid), { relationship: name, updatedAt: serverTimestamp() });
+  await logAudit('update', 'family', m.uid, `Moved ${m.displayName} ${name ? `to “${name}”` : 'out of their family'}${familyOf(m) ? ` (was “${familyOf(m)}”)` : ''}`, { relationship: m.relationship }, { relationship: name });
+}

@@ -228,6 +228,43 @@ try {
   if (!fam.includes('₹750') || !fam.includes('₹100')) throw new Error('unexpected family split: ' + fam);
   await shot(admin, 'expense-family-chip');
   ok('Whole-family select in the expense form: 75% + 10% split ₹850 as ₹750 / ₹100');
+
+  // 12. Family board: drag and drop between families (made-up names)
+  await admin.goto(`${BASE}/members`);
+  await admin.getByRole('tab', { name: 'Family board' }).click();
+  const col = (name) => admin.getByRole('listitem', { name, exact: true });
+  await col('Test Family').waitFor();
+  async function drag(person, target) {
+    const from = await admin.getByRole('button', { name: new RegExp(`^${person}\\.`) }).boundingBox();
+    const to = await col(target).boundingBox();
+    await admin.mouse.move(from.x + 40, from.y + from.height / 2);
+    await admin.mouse.down();
+    await admin.mouse.move(from.x + 60, from.y + from.height / 2 + 10, { steps: 5 });
+    await admin.mouse.move(to.x + to.width / 2, to.y + 60, { steps: 15 });
+    await admin.mouse.up();
+  }
+  await drag('Kavin \\(kid\\)', 'Test Family');
+  await col('Test Family').getByText('Kavin (kid)').waitFor();
+  await shot(admin, 'family-board');
+  ok('Dragged a person into another family on the board');
+
+  await drag('Baby Nila', 'New family');
+  await admin.getByLabel('Family name').fill('Sample Family');
+  await admin.getByRole('button', { name: 'Create & move' }).click();
+  await col('Sample Family').getByText('Baby Nila').waitFor();
+  ok('Dropping on "New family" asks for a name and creates the family');
+
+  await admin.getByLabel('Move Kavin (kid) to family').selectOption('');
+  await col('No family').getByText('Kavin (kid)').waitFor();
+  ok('"Move to" menu works without dragging');
+
+  // keyboard: focus card, space to pick up, arrow right to next column, space to drop
+  await admin.getByRole('button', { name: /^Bob Uncle\./ }).focus();
+  await admin.keyboard.press('Space');
+  await admin.keyboard.press('ArrowRight');
+  await admin.keyboard.press('Space');
+  await admin.waitForTimeout(500);
+  ok('Keyboard drag does not crash (space / arrows / space)');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

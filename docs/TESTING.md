@@ -36,6 +36,7 @@
 
 ### Expenses
 - [ ] Trip Settings: change child/infant default %. People without their own % follow it in new expenses; saved expenses keep their split
+- [ ] Family board (Member Management → Family board): drag a person to another family with the mouse, press-and-hold drag on a phone, drop on "New family", and use the Move to menu
 - [ ] Family groups: add a person to a family from the family header, rename a family, select a whole family in an expense or ticket, and check Settlement → By family
 - [ ] Admin adds a child at 50% and an infant without email. A ₹1,000 "everyone" expense with 3 adults + 1 child splits ₹285.71 / ₹142.86 and the infant ₹0
 - [ ] A family member signs in, and the admin links them to their existing traveller on approval. Their balance and tickets show correctly
