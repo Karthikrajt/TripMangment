@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { useState } from 'react';
 import { Bus, Pencil, Plus, Trash2, MapPin, Clock, User } from 'lucide-react';
 import { useTransport } from '../hooks/data';
@@ -44,9 +45,9 @@ export default function Transport() {
       ) : (
         <div className="grid gap-5 md:grid-cols-2">
           {data.map((v) => (
-            <Card key={v.id} className={me && v.memberUids.includes(me.uid) ? 'ring-2 ring-brand-500' : ''}>
+            <Card key={v.id} className={me && v.memberUids.includes(personIdOf(me)) ? 'ring-2 ring-brand-500' : ''}>
               <CardHeader icon={<Bus className="size-5" />} title={`${v.vehicleType}${v.registrationNumber ? ' · ' + v.registrationNumber : ''}`} subtitle={`Capacity ${v.capacity}`}
-                action={me && v.memberUids.includes(me.uid) ? <Badge tone="brand">Your vehicle</Badge> : undefined} />
+                action={me && v.memberUids.includes(personIdOf(me)) ? <Badge tone="brand">Your vehicle</Badge> : undefined} />
               <CardBody className="space-y-3">
                 <div className="rounded-xl bg-amber-50 p-3">
                   <p className="flex items-center gap-2 font-semibold text-amber-900"><Clock className="size-4" /> Pickup {formatDate(v.pickupDate)} {formatTime(v.pickupTime)}</p>

@@ -12,6 +12,7 @@ export type ClockTime = string; // HH:mm
 export type Paise = number; // integer money (₹1 = 100 paise)
 
 export type Role = 'admin' | 'member';
+export type AgeGroup = 'adult' | 'child' | 'infant';
 export type MemberStatus = 'pending' | 'approved' | 'rejected' | 'disabled';
 
 export interface Trip {
@@ -44,6 +45,19 @@ export interface Member {
   decidedAt: TS;
   decidedBy: string;
   updatedAt: TS;
+  /**
+   * People model: every traveller is a member document. Travellers added by
+   * the admin have `hasLogin: false` and a random id; they never sign in.
+   * A sign-in account can be linked to such a traveller via `personId`
+   * (the account then acts as that person and is hidden from people lists).
+   */
+  ageGroup?: AgeGroup;
+  /** Per-head share in percent: adult 100, child e.g. 50, infant 0. */
+  shareWeight?: number;
+  hasLogin?: boolean;
+  personId?: string;
+  /** On a traveller: the sign-in account linked to it. */
+  linkedUid?: string;
 }
 
 export interface ItineraryItem {

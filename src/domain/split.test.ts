@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeSplits, equalSplit, isSplitConsistent } from './split';
+import { computeSplits, equalSplit, isSplitConsistent, weightedSplit } from './split';
 import { formatINR, paiseToInput, rupeesToPaise } from './money';
 
 describe('money', () => {
@@ -55,5 +55,29 @@ describe('computeSplits', () => {
   });
   it('rejects zero amounts', () => {
     expect(computeSplits({ method: 'equal_all', amount: 0, allMemberUids: all, selectedUids: [], custom: {} }).ok).toBe(false);
+  });
+});
+
+describe('per-head weighted split', () => {
+  it('counts children by percentage and skips infants', () => {
+    // 2 adults, 1 child at 50%, 1 infant → 2.5 shares of ₹1000
+    const r = computeSplits({
+      method: 'equal_all', amount: 100000, allMemberUids: ['a1', 'a2', 'c', 'i'], selectedUids: [], custom: {},
+      weights: { a1: 100, a2: 100, c: 50, i: 0 },
+    });
+    expect(r).toEqual({ ok: true, splits: { a1: 40000, a2: 40000, c: 20000 } });
+  });
+  it('always sums exactly with awkward weights', () => {
+    const s = weightedSplit(100001, { a: 100, b: 33, c: 75, d: 0 });
+    expect(Object.values(s).reduce((x, y) => x + y)).toBe(100001);
+    expect(s.d).toBeUndefined();
+  });
+  it('selected split uses weights too', () => {
+    const r = computeSplits({ method: 'equal_selected', amount: 3000, allMemberUids: [], selectedUids: ['a', 'c'], custom: {}, weights: { a: 100, c: 50 } });
+    expect(r).toEqual({ ok: true, splits: { a: 2000, c: 1000 } });
+  });
+  it('rejects a selection of only infants', () => {
+    const r = computeSplits({ method: 'equal_selected', amount: 3000, allMemberUids: [], selectedUids: ['i'], custom: {}, weights: { i: 0 } });
+    expect(r.ok).toBe(false);
   });
 });

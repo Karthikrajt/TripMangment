@@ -93,13 +93,25 @@ service cloud.firestore {
         function isSelf() { return signedIn() && uid() == memberId; }
         function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'updatedAt']; }
         function validMember(d) {
-          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt'])
+          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'hasLogin', 'personId', 'linkedUid'])
             && d.uid == memberId
             && str(d.displayName, 100) && str(d.email, 200) && str(d.photoURL, 1000)
             && str(d.phone, 30) && str(d.emergencyContact, 200) && str(d.relationship, 100)
             && str(d.requestNote, 500)
             && d.role in ['admin', 'member']
-            && d.status in ['pending', 'approved', 'rejected', 'disabled'];
+            && d.status in ['pending', 'approved', 'rejected', 'disabled']
+            && (!('ageGroup' in d) || d.ageGroup in ['adult', 'child', 'infant'])
+            && (!('shareWeight' in d) || (d.shareWeight is int && d.shareWeight >= 0 && d.shareWeight <= 100))
+            && (!('hasLogin' in d) || d.hasLogin is bool)
+            && (!('personId' in d) || str(d.personId, 128))
+            && (!('linkedUid' in d) || str(d.linkedUid, 128));
+        }
+        // Fields only an admin may set on a sign-in account.
+        function noAdminFields(d) {
+          return (!('personId' in d) || d.personId == '')
+            && (!('ageGroup' in d) || d.ageGroup == 'adult')
+            && (!('shareWeight' in d) || d.shareWeight == 100)
+            && (!('linkedUid' in d) || d.linkedUid == '');
         }
         function isOwnerTarget() { return trip(tripId).ownerUid == memberId; }
 
@@ -107,13 +119,17 @@ service cloud.firestore {
 
         // A signed-in user may only create their OWN pending request, with
         // their verified Google email. The trip owner bootstraps as admin.
-        allow create: if isSelf() && validMember(incoming())
+        allow create: if (isSelf() && validMember(incoming()) && noAdminFields(incoming())
           && incoming().email == request.auth.token.email
           && (
             (incoming().status == 'pending' && incoming().role == 'member' && incoming().requestedAt == request.time && incoming().decidedBy == '')
             || (incoming().status == 'approved' && incoming().role == 'admin'
                 && existsAfter(tripPath(tripId)) && getAfter(tripPath(tripId)).data.ownerUid == uid())
-          );
+          ))
+          // Admin adds a traveller who does not sign in (email optional).
+          || (isAdmin(tripId) && !isSelf() && validMember(incoming())
+              && incoming().hasLogin == false && incoming().status == 'approved' && incoming().role == 'member'
+              && (!('personId' in incoming()) || incoming().personId == ''));
 
         allow update: if validMember(incoming()) && unchanged(['uid', 'email']) && (
           // Admin: full control, except nobody but the owner may change the owner's role/status.
@@ -126,7 +142,7 @@ service cloud.firestore {
               && changed().hasOnly(profileKeys().concat(['status', 'requestNote', 'requestedAt'])))
         );
 
-        allow delete: if isAdmin(tripId) && !isOwnerTarget();
+        allow delete: if isAdmin(tripId) && !isOwnerTarget() && !isSelf();
       }
 
       // ---------- admin-managed shared content -----------------------------

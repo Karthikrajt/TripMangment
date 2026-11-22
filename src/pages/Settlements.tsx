@@ -1,3 +1,4 @@
+import { personIdOf, peopleOf } from '../domain/people';
 import { useMemo, useState } from 'react';
 import { ArrowRight, CheckCircle2, Scale, Trash2, AlertTriangle } from 'lucide-react';
 import { useExpenses, useSettlements } from '../hooks/data';
@@ -26,9 +27,10 @@ export default function Settlements() {
   const admin = useIsAdmin();
   const [recording, setRecording] = useState<Transfer | null>(null);
 
-  const memberUids = useMemo(() => members.filter((m) => m.status === 'approved').map((m) => m.uid), [members]);
+  const memberUids = useMemo(() => peopleOf(members).map((m) => m.uid), [members]);
+  const myId = personIdOf(me);
   const summary = useMemo(() => computeSettlement(expenses.data, settlements.data, memberUids), [expenses.data, settlements.data, memberUids]);
-  const mine = summary.balances.find((b) => b.uid === me?.uid);
+  const mine = summary.balances.find((b) => b.uid === myId);
 
   if (expenses.loading || settlements.loading) return <Spinner />;
 
@@ -60,7 +62,7 @@ export default function Settlements() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Total approved expenses" value={formatINR(summary.totalApproved)} />
-        <Stat label="Members" value={memberUids.length} />
+        <Stat label="People" value={memberUids.length} hint="Per head; children by %, infants free" />
         <Stat label="You paid" value={formatINR(mine?.paid ?? 0)} />
         <Stat
           label={mine && mine.outstanding < 0 ? 'You need to pay' : 'You will receive'}
@@ -77,7 +79,7 @@ export default function Settlements() {
           ) : (
             <ul className="space-y-2">
               {summary.suggestions.map((t, i) => {
-                const involvesMe = t.fromUid === me?.uid || t.toUid === me?.uid;
+                const involvesMe = t.fromUid === myId || t.toUid === myId;
                 return (
                   <li key={i} className={`flex flex-wrap items-center gap-3 rounded-xl border p-3 ${involvesMe ? 'border-brand-300 bg-brand-50' : 'border-slate-200'}`}>
                     <span className="flex min-w-0 flex-1 items-center gap-2">
@@ -106,7 +108,7 @@ export default function Settlements() {
               {summary.balances.map((b) => {
                 const m = members.find((x) => x.uid === b.uid);
                 return (
-                  <tr key={b.uid} className={b.uid === me?.uid ? 'bg-brand-50/50' : ''}>
+                  <tr key={b.uid} className={b.uid === myId ? 'bg-brand-50/50' : ''}>
                     <td className="px-4 py-2.5"><span className="flex items-center gap-2"><Avatar name={m?.displayName ?? '?'} photo={m?.photoURL} size={28} />{m?.displayName ?? 'Former member'}</span></td>
                     <td className="px-4 py-2.5 text-right">{formatINR(b.paid)}</td>
                     <td className="px-4 py-2.5 text-right">{formatINR(b.share)}</td>

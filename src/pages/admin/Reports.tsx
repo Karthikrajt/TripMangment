@@ -1,3 +1,4 @@
+import { peopleOf, headCount } from '../../domain/people';
 import { useMemo, useState } from 'react';
 import { BarChart3, Download, Printer, Gauge, RefreshCw } from 'lucide-react';
 import { collection, getCountFromServer } from 'firebase/firestore';
@@ -22,7 +23,8 @@ export default function Reports() {
   const expenses = useExpenses();
   const settlements = useSettlements();
   const { members, trip } = useSession();
-  const approvedUids = useMemo(() => members.filter((m) => m.status === 'approved').map((m) => m.uid), [members]);
+  const approvedUids = useMemo(() => peopleOf(members).map((m) => m.uid), [members]);
+  const heads = headCount(peopleOf(members));
   const approved = expenses.data.filter((e) => e.status === 'approved');
   const total = sumPaise(approved.map((e) => e.amountPaise));
   const summary = useMemo(() => computeSettlement(expenses.data, settlements.data, approvedUids), [expenses.data, settlements.data, approvedUids]);
@@ -58,7 +60,7 @@ export default function Reports() {
         </div>} />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Total approved" value={formatINR(total)} />
-        <Stat label="Per person (avg)" value={formatINR(approvedUids.length ? Math.round(total / approvedUids.length) : 0)} />
+        <Stat label="Per head (adult)" value={formatINR(heads ? Math.round(total / heads) : 0)} hint={`${heads} full shares`} />
         <Stat label="Approved / pending / rejected" value={`${approved.length} / ${expenses.data.filter((e) => e.status === 'pending').length} / ${expenses.data.filter((e) => e.status === 'rejected').length}`} />
         <Stat label="Transfers to settle" value={summary.suggestions.length} />
       </div>

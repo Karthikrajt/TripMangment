@@ -1,3 +1,4 @@
+import { personIdOf, peopleOf, headCount, ageSummary } from '../domain/people';
 import { CalendarDays, Hotel, Bus, Receipt, MessagesSquare, Ticket, Megaphone, Activity, Users, Train, UserCheck, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useSession, useIsAdmin } from '../store/session';
@@ -21,7 +22,8 @@ export default function Dashboard() {
   const transport = useTransport();
   const announcements = useAnnouncements(3);
 
-  const approved = members.filter((m) => m.status === 'approved');
+  const approved = peopleOf(members);
+  const heads = headCount(approved);
   const pending = members.filter((m) => m.status === 'pending');
   const approvedExpenses = expenses.data.filter((e) => e.status === 'approved');
   const total = sumPaise(approvedExpenses.map((e) => e.amountPaise));
@@ -31,7 +33,7 @@ export default function Dashboard() {
   const upcoming = upcomingItems(itinerary.data, 4);
   const todayIso = todayIST();
   const nextTicket = tickets.data.find((t) => t.journeyDate >= todayIso) ?? tickets.data[0];
-  const myTickets = tickets.data.filter((t) => member && t.passengerUids.includes(member.uid)).length;
+  const myTickets = tickets.data.filter((t) => member && t.passengerUids.includes(personIdOf(member))).length;
   const hotel = hotels.data.find((h) => h.checkOutDate >= todayIso) ?? hotels.data[0];
   const vehicle = transport.data.find((v) => v.pickupDate >= todayIso) ?? transport.data[0];
 
@@ -65,14 +67,14 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Members" value={approved.length} hint={<Link className="text-brand-700 font-semibold" to="/members">View all</Link>} />
+        <Stat label="People" value={approved.length} hint={<Link className="text-brand-700 font-semibold" to="/members">{ageSummary(approved)}</Link>} />
         {admin ? (
           <Stat label="Pending approvals" value={pending.length} hint={pending.length ? <Link className="text-brand-700 font-semibold" to="/admin/approvals">Review now</Link> : 'All caught up'} />
         ) : (
           <Stat label="My tickets" value={myTickets} hint={<Link className="text-brand-700 font-semibold" to="/tickets">Open tickets</Link>} />
         )}
         <Stat label="Total trip expenses" value={formatINR(total)} hint="Approved only" />
-        <Stat label="Per person" value={formatINR(approved.length ? Math.round(total / approved.length) : 0)} hint="Average share" />
+        <Stat label="Per head (adult)" value={formatINR(heads ? Math.round(total / heads) : 0)} hint={`${heads} full shares · infants free`} />
       </div>
 
       {admin && (pending.length > 0 || pendingReview > 0) && (

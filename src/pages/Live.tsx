@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { Link } from 'react-router-dom';
 import { Bus, CalendarDays, Hotel, Megaphone, MessagesSquare, Phone, Receipt, ShieldAlert, Ticket, Train, BedDouble } from 'lucide-react';
 import { useSession } from '../store/session';
@@ -24,11 +25,11 @@ export default function Live() {
 
   const items = todaysItems(itinerary.data);
   const schedule = items.length ? items : upcomingItems(itinerary.data, 3);
-  const myTickets = tickets.data.filter((t) => member && t.passengerUids.includes(member.uid));
+  const myTickets = tickets.data.filter((t) => member && t.passengerUids.includes(personIdOf(member)));
   const nextTicket = (myTickets.length ? myTickets : tickets.data).find((t) => t.journeyDate >= today);
   const hotel = hotels.data.find((h) => h.checkInDate <= today && h.checkOutDate >= today) ?? hotels.data.find((h) => h.checkOutDate >= today) ?? hotels.data[0];
-  const myRoom = rooms.data.find((r) => member && r.memberUids.includes(member.uid));
-  const vehicle = transport.data.find((v) => member && v.memberUids.includes(member.uid) && v.pickupDate >= today) ?? transport.data.find((v) => v.pickupDate >= today) ?? transport.data[0];
+  const myRoom = rooms.data.find((r) => member && r.memberUids.includes(personIdOf(member)));
+  const vehicle = transport.data.find((v) => member && v.memberUids.includes(personIdOf(member)) && v.pickupDate >= today) ?? transport.data.find((v) => v.pickupDate >= today) ?? transport.data[0];
   const admins = members.filter((m) => m.status === 'approved' && m.role === 'admin' && m.phone);
 
   return (

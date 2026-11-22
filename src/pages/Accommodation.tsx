@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { useState } from 'react';
 import { Hotel, Pencil, Plus, Trash2, BedDouble } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -46,7 +47,7 @@ export default function Accommodation() {
       ) : (
         <div className="space-y-5">
           {data.map((h) => {
-            const myRoom = rooms.data.find((r) => r.accommodationId === h.id && me && r.memberUids.includes(me.uid));
+            const myRoom = rooms.data.find((r) => r.accommodationId === h.id && me && r.memberUids.includes(personIdOf(me)));
             return (
               <Card key={h.id}>
                 <CardHeader icon={<Hotel className="size-5" />} title={h.name} subtitle={h.bookingReference && `Booking ref: ${h.bookingReference}`}

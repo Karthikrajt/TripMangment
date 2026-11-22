@@ -67,6 +67,24 @@ try {
   await alice.getByText('Hello, Alice').waitFor({ timeout: 15000 });
   ok('Admin approved the request; member gains access in real time');
 
+  // 3b. Admin adds travellers who never sign in (no email): a child at 50% and an infant
+  async function addTraveller(name, age, extra) {
+    await admin.goto(`${BASE}/members`);
+    await admin.getByRole('button', { name: 'Add traveller' }).first().click();
+    await admin.getByLabel('Full name').fill(name);
+    await admin.getByLabel('Age group').selectOption(age);
+    if (extra) await extra();
+    await admin.getByRole('button', { name: 'Add', exact: true }).click();
+    await admin.getByText(name).first().waitFor();
+  }
+  await addTraveller('Kavin (kid)', 'child');
+  await addTraveller('Baby Nila', 'infant');
+  await addTraveller('Bob Uncle', 'adult', () => admin.getByLabel('Email (optional)').fill('bob@gmail.com'));
+  await admin.getByText('Child · 50%').waitFor();
+  await admin.getByText('Infant · not counted').waitFor();
+  await shot(admin, 'members-people');
+  ok('Admin added a child (50%), an infant and an adult without them signing in');
+
   // 4. Admin adds an itinerary item, member sees it
   await admin.goto(`${BASE}/itinerary`);
   await admin.getByRole('button', { name: 'Add activity' }).first().click();
@@ -90,7 +108,13 @@ try {
   // 6. Member adds an expense; admin verifies; settlement reflects it
   await alice.goto(`${BASE}/expenses/new`);
   await alice.getByLabel('Expense title').fill('Dinner at station');
-  await alice.getByLabel('Amount (₹)').fill('1000.50');
+  await alice.getByLabel('Amount (₹)').fill('1000');
+  // 3 adults (Ravi, Alice, Bob Uncle) + child at 50% = 3.5 shares; infant free → ₹285.71 per adult
+  await alice.locator('li', { hasText: 'Kavin (kid)' }).first().waitFor();
+  const previewText = await alice.locator('ul', { hasText: 'Kavin (kid)' }).innerText();
+  if (previewText.includes('Baby Nila')) throw new Error('infant should not be in the split');
+  if (!previewText.includes('₹142.86') || !previewText.includes('₹285.71')) throw new Error('unexpected per-head preview: ' + previewText);
+  await shot(alice, 'expense-preview-mobile');
   await alice.getByRole('button', { name: 'Submit expense' }).click();
   await alice.getByText('Dinner at station').waitFor();
   await alice.locator('span', { hasText: /^pending$/ }).first().waitFor();
@@ -104,12 +128,12 @@ try {
 
   await alice.goto(`${BASE}/settlements`);
   await alice.getByText('Ravi Kumar').first().waitFor();
-  await alice.getByText('₹1,000.50').first().waitFor();
+  await alice.getByText('₹1,000').first().waitFor();
   await shot(alice, 'settlement-mobile');
   await admin.goto(`${BASE}/settlements`);
-  await admin.getByRole('button', { name: 'Mark as paid' }).waitFor();
+  await admin.getByRole('button', { name: 'Mark as paid' }).first().waitFor();
   await shot(admin, 'settlement-admin');
-  ok('Settlement suggests Ravi pays Alice ₹500.25 (equal split of ₹1,000.50)');
+  ok('Per-head split: adults ₹285.71, child ₹142.86, infant ₹0 – settlement shows who pays Alice');
 
   // 7. Group chat
   await alice.goto(`${BASE}/chat`);
@@ -135,6 +159,8 @@ try {
   // 9. A pending user cannot read trip data even via direct API
   const bob = await user('bob@gmail.com', 'Bob', true);
   await bob.getByRole('heading', { name: 'Request to join' }).waitFor();
+  await bob.getByRole('button', { name: 'Send request' }).click();
+  await bob.getByText('Waiting for approval').waitFor();
   const denied = await bob.evaluate(async () => {
     const r = await fetch('http://127.0.0.1:8080/v1/projects/demo-trip/databases/(default)/documents/trips/main/itinerary', {
       headers: { Authorization: `Bearer ${await window.__e2eToken()}` },
@@ -143,6 +169,19 @@ try {
   });
   if (denied !== 403) throw new Error(`expected 403 for pending user, got ${denied}`);
   ok('Pending user gets 403 on a direct Firestore REST read');
+
+  // 10. Admin approves Bob and links him to the traveller "Bob Uncle" (matched by email)
+  await admin.goto(`${BASE}/admin/approvals`);
+  await admin.getByLabel('Who is this?').waitFor();
+  const linked = await admin.getByLabel('Who is this?').inputValue();
+  if (!linked) throw new Error('expected Bob to be matched to the existing traveller by email');
+  await admin.getByRole('button', { name: 'Approve' }).first().click();
+  await bob.getByText('Hello, Bob').waitFor({ timeout: 15000 });
+  await bob.goto(`${BASE}/settlements`);
+  await bob.getByText('You need to pay').waitFor();
+  await bob.getByText('₹285.71').first().waitFor();
+  await shot(bob, 'bob-linked-settlement');
+  ok('Sign-in linked to an existing traveller sees that traveller’s share as their own');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

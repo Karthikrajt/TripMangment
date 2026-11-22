@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, X, UserCheck } from 'lucide-react';
 import { useSession } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -6,8 +6,10 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Avatar } from '../../components/ui/Avatar';
 import { Badge, EmptyState } from '../../components/ui/Feedback';
+import { SelectField } from '../../components/ui/Field';
 import { toast } from '../../components/ui/Toast';
 import { decideMember } from '../../services/members';
+import { ageLabel } from '../../domain/people';
 import { formatDateTime } from '../../lib/format';
 import { errorMessage } from '../../lib/retry';
 import type { Member, MemberStatus } from '../../domain/types';
@@ -15,14 +17,27 @@ import type { Member, MemberStatus } from '../../domain/types';
 export default function Approvals() {
   const { members, member: me } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
+  const [linkChoice, setLinkChoice] = useState<Record<string, string>>({});
   const pending = members.filter((m) => m.status === 'pending').sort((a, b) => (a.requestedAt?.toMillis() ?? 0) - (b.requestedAt?.toMillis() ?? 0));
   const decided = members.filter((m) => m.status === 'rejected' || m.status === 'disabled');
+  // Travellers added by the admin who are not yet linked to a sign-in account.
+  const unlinked = useMemo(() => members.filter((m) => m.hasLogin === false && m.status === 'approved' && !m.linkedUid), [members]);
+
+  const suggested = (m: Member) => {
+    const email = m.email.toLowerCase();
+    const byEmail = unlinked.find((p) => p.email && p.email === email);
+    if (byEmail) return byEmail.uid;
+    const byName = unlinked.find((p) => p.displayName.trim().toLowerCase() === m.displayName.trim().toLowerCase());
+    return byName?.uid ?? '';
+  };
+  const choice = (m: Member) => linkChoice[m.uid] ?? suggested(m);
 
   const decide = async (m: Member, status: MemberStatus) => {
     setBusy(m.uid + status);
     try {
-      await decideMember(me!.uid, m, status);
-      toast.success(`${m.displayName} ${status}`);
+      const link = m.status !== 'pending' ? undefined : status === 'approved' ? unlinked.find((p) => p.uid === choice(m)) ?? null : null;
+      await decideMember(me!.uid, m, status, link);
+      toast.success(`${m.displayName} ${status}${link ? ` as ${link.displayName}` : ''}`);
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {
@@ -32,14 +47,14 @@ export default function Approvals() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Member Approvals" subtitle="Only approved members can see trip information and files." />
+      <PageHeader title="Member Approvals" subtitle="People who signed in and asked to join. Only approved accounts can see trip information." />
       {pending.length === 0 ? (
         <EmptyState icon={<UserCheck className="size-7" />} title="No pending requests" message="When someone signs in and asks to join, they will appear here." />
       ) : (
         <ul className="space-y-3">
           {pending.map((m) => (
-            <Card as="li" key={m.uid} className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
-              <div className="flex flex-1 items-center gap-3">
+            <Card as="li" key={m.uid} className="space-y-4 p-4">
+              <div className="flex items-center gap-3">
                 <Avatar name={m.displayName} photo={m.photoURL} size={52} />
                 <div className="min-w-0">
                   <p className="font-semibold">{m.displayName}</p>
@@ -49,7 +64,12 @@ export default function Approvals() {
                   <p className="text-xs text-slate-400">Requested {formatDateTime(m.requestedAt)}</p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <SelectField label="Who is this?" value={choice(m)} onChange={(e) => setLinkChoice({ ...linkChoice, [m.uid]: e.target.value })}
+                hint={unlinked.length ? 'Pick their name if you already added them as a traveller, so their expenses and tickets stay together.' : undefined}>
+                <option value="">A new traveller (adult)</option>
+                {unlinked.map((p) => <option key={p.uid} value={p.uid}>{p.displayName} · {ageLabel(p)}{p.relationship ? ` · ${p.relationship}` : ''}</option>)}
+              </SelectField>
+              <div className="flex justify-end gap-2">
                 <Button variant="danger" icon={<X className="size-5" />} loading={busy === m.uid + 'rejected'} onClick={() => decide(m, 'rejected')}>Reject</Button>
                 <Button variant="success" icon={<Check className="size-5" />} loading={busy === m.uid + 'approved'} onClick={() => decide(m, 'approved')}>Approve</Button>
               </div>

@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive } from 'lucide-react';
@@ -51,7 +52,7 @@ export default function Tickets() {
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
     return data.filter((t) => {
-      if (filter === 'mine' && !(me && t.passengerUids.includes(me.uid))) return false;
+      if (filter === 'mine' && !(me && t.passengerUids.includes(personIdOf(me)))) return false;
       if (filter === 'uploaded' && t.uploadedBy !== me?.uid) return false;
       if (!needle) return true;
       const passengerText = [...t.passengerNames, ...t.passengerUids.map((u) => members.find((m) => m.uid === u)?.displayName ?? '')].join(' ');

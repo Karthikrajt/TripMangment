@@ -10,6 +10,7 @@ import { upsertUserProfile } from '../services/users';
 import { getPublicSummary, type PublicSummary } from '../services/trip';
 import type { AppNotification, ChatMessage, Member, Trip, UserProfile } from '../domain/types';
 import { isAdmin as isAdminFn } from '../domain/permissions';
+import { peopleOf, personIdOf } from '../domain/people';
 import { CHAT_PAGE_SIZE, NOTIFICATION_PAGE_SIZE } from '../config/constants';
 import { errorMessage } from '../lib/retry';
 import { useSync } from '../lib/sync';
@@ -149,7 +150,11 @@ onAuthStateChanged(auth, (user) => {
 // ---------- selectors ----------
 export const useMe = () => useSession((s) => s.member);
 export const useIsAdmin = () => useSession((s) => isAdminFn(s.member));
-export const useApprovedMembers = () => useSession((s) => s.members).filter((m) => m.status === 'approved');
+/** Travellers to plan and split for (see domain/people.ts). */
+export const useApprovedMembers = () => peopleOf(useSession((s) => s.members));
+export const usePeople = useApprovedMembers;
+/** The person id the signed-in user acts as (their linked traveller, or themselves). */
+export const useMyPersonId = () => useSession((s) => personIdOf(s.member));
 
 export function memberName(members: Member[], uid: string): string {
   return members.find((m) => m.uid === uid)?.displayName ?? 'Former member';

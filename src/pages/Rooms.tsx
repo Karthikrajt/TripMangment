@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { useMemo, useState } from 'react';
 import { BedDouble, Pencil, Plus, Trash2, AlertTriangle } from 'lucide-react';
 import { useAccommodations, useRooms } from '../hooks/data';
@@ -27,7 +28,7 @@ export default function Rooms() {
   const admin = useIsAdmin();
   const [editing, setEditing] = useState<Room | 'new' | null>(null);
 
-  const mine = data.filter((r) => me && r.memberUids.includes(me.uid));
+  const mine = data.filter((r) => me && r.memberUids.includes(personIdOf(me)));
   const unassigned = useMemo(() => approved.filter((m) => !data.some((r) => r.memberUids.includes(m.uid))), [approved, data]);
   const hotelName = (id: string) => hotels.data.find((h) => h.id === id)?.name ?? 'Unassigned hotel';
 
@@ -62,7 +63,7 @@ export default function Rooms() {
           {data.map((r) => {
             const over = r.bedCapacity > 0 && r.memberUids.length > r.bedCapacity;
             return (
-              <Card as="li" key={r.id} className={`p-4 ${me && r.memberUids.includes(me.uid) ? 'ring-2 ring-brand-500' : ''}`}>
+              <Card as="li" key={r.id} className={`p-4 ${me && r.memberUids.includes(personIdOf(me)) ? 'ring-2 ring-brand-500' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <h3 className="text-lg font-bold">{r.name}</h3>

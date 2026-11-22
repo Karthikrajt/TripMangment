@@ -19,13 +19,14 @@ Open source under the [MIT License](LICENSE). Contributions welcome.
 
 | Area | What you get |
 |---|---|
+| People | Admin adds every traveller (email optional) as adult, child (custom %) or infant (not counted). Only people who add expenses or tickets need to sign in; their account is linked to their traveller when the admin approves it |
 | Access | Google sign-in, request to join, admin approve/reject/disable, admin/member roles, bootstrap admin on first run |
 | Dashboard | Countdown or "Day N", member/expense stats, today's schedule, travel/hotel/pickup cards, announcements, recent activity, quick actions |
 | Itinerary | Day-wise activities, 12-hour times, Google Maps links, coordinator, instructions, draft/publish, change notifications |
 | Train tickets | PDF/JPG/PNG upload, multi-passenger assignment (members plus free-text names), search/filter, preview/download through signed URLs, per-ticket and trip-wide admin lock, explicit "Save for offline" |
 | Stay | Hotels with booking confirmation document, check-in/out, map, call; room allocation with capacity warnings and "your room" |
 | Transport | Multiple vehicles, driver call button, pickup schedule, navigation, member assignment |
-| Expenses | 10 categories, integer paise, 4 split methods (equal-all, equal-selected, custom, trip-wide) with exact-sum validation, receipts, admin verification, offline queue with idempotency keys |
+| Expenses | 10 categories, integer paise, per-head split (children by %, infants free) for everyone or selected people, or custom amounts, with exact-sum validation, receipts, admin verification, offline queue with idempotency keys |
 | Settlement | Paid − share balances, minimum-transfer suggestions, separate settlement records (mark paid, date, reference) |
 | Chat | One real-time group chat with images/documents, unread counts, announcements mirrored into chat |
 | Notifications | In-app feed (source of truth) plus best-effort FCM web push |

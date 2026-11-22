@@ -5,7 +5,7 @@
 | Suite | Command | Covers |
 |---|---|---|
 | Unit | `npm test` | Rupee↔paise parsing, equal/selected/custom/trip-wide splits, exact-sum validation, settlement (including the spec example), transfer minimisation, IST date/time formatting, file type/size/MIME/path validation, CSV escaping |
-| Security rules | `npm run test:rules` | 31 direct-API cases: unauthenticated and pending lockout, self-only access requests, no self-approval, bootstrap admin, admin-only content, ticket create/read for all, no cross-member ticket edit/delete, locks, admin manages all tickets, expense ownership/status/amount rules, no member approvals, idempotent expense ids, chat impersonation, notification query restrictions |
+| Security rules | `npm run test:rules` | 39 direct-API cases (including travellers without login and account linking): unauthenticated and pending lockout, self-only access requests, no self-approval, bootstrap admin, admin-only content, ticket create/read for all, no cross-member ticket edit/delete, locks, admin manages all tickets, expense ownership/status/amount rules, no member approvals, idempotent expense ids, chat impersonation, notification query restrictions |
 | UI smoke | `npm run emulators`, then `npm run dev`, then `npm run test:e2e` | Setup → request → approve (real time) → itinerary → admin-page guard → expense → verification → settlement → chat → every page renders → audit entry → pending user gets 403 from the REST API |
 | Edge Functions | `npm run check:functions` | Deno type-check |
 
@@ -33,6 +33,8 @@
 - [ ] "Save for offline", then airplane mode, then "Open offline copy" works. Profile lists the copy and can remove it
 
 ### Expenses
+- [ ] Admin adds a child at 50% and an infant without email. A ₹1,000 "everyone" expense with 3 adults + 1 child splits ₹285.71 / ₹142.86 and the infant ₹0
+- [ ] A family member signs in, and the admin links them to their existing traveller on approval. Their balance and tickets show correctly
 - [ ] Equal split across all members, including remainder paise (₹100 / 3)
 - [ ] Split among selected members
 - [ ] Custom split: Submit is blocked until the parts add up exactly

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { Member } from '../domain/types';
 import { Avatar } from './ui/Avatar';
+import { ageGroupOf, ageLabel } from '../domain/people';
 
 export function MemberPicker({
   members,
@@ -48,6 +49,7 @@ export function MemberPicker({
             <span className="flex-1">
               {m.displayName}
               {m.relationship && <span className="ml-1 text-sm text-slate-500">· {m.relationship}</span>}
+              {ageGroupOf(m) !== 'adult' && <span className="ml-1 rounded-full bg-amber-100 px-2 text-xs font-semibold text-amber-800">{ageLabel(m)}</span>}
             </span>
           </label>
         ))}

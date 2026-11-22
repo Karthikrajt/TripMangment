@@ -107,6 +107,42 @@ describe('authentication & membership', () => {
   });
 });
 
+describe('travellers without login', () => {
+  const traveller = (extra: Record<string, unknown> = {}) => ({
+    ...memberDoc('kid1', 'member', 'approved'), email: '', hasLogin: false, ageGroup: 'child', shareWeight: 50, ...extra,
+  });
+  it('admin can add a traveller without email', async () => {
+    await assertSucceeds(setDoc(doc(db('owner'), `trips/${T}/members/kid1`), traveller()));
+  });
+  it('members cannot add travellers', async () => {
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/members/kid1`), traveller()));
+  });
+  it('admin cannot add a traveller as admin or as a login account', async () => {
+    await assertFails(setDoc(doc(db('owner'), `trips/${T}/members/kid1`), traveller({ role: 'admin' })));
+    await assertFails(setDoc(doc(db('owner'), `trips/${T}/members/kid1`), traveller({ hasLogin: true })));
+  });
+  it('rejects invalid share weights', async () => {
+    await assertFails(setDoc(doc(db('owner'), `trips/${T}/members/kid1`), traveller({ shareWeight: 150 })));
+  });
+  it('a member cannot link themselves to a traveller or change their own share', async () => {
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/alice`), { personId: 'kid1' }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/alice`), { shareWeight: 10 }));
+  });
+  it('a new sign-in cannot claim a traveller or a reduced share', async () => {
+    const f = db('newbie');
+    const base = { ...memberDoc('newbie', 'member', 'pending'), email: 'newbie@x.com', requestedAt: serverTimestamp() };
+    await assertFails(setDoc(doc(f, `trips/${T}/members/newbie`), { ...base, personId: 'kid1' }));
+    await assertFails(setDoc(doc(f, `trips/${T}/members/newbie`), { ...base, ageGroup: 'infant' }));
+  });
+  it('admin can link a sign-in account to a traveller', async () => {
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/members/alice`), { personId: 'kid1' }));
+  });
+  it('expenses can be paid by a traveller without login', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/kid1`), traveller()));
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/expenses/e9`), expense('alice', { paidBy: 'kid1', splits: { alice: 600, kid1: 400 } })));
+  });
+});
+
 describe('admin-only content', () => {
   it('members can read but not write itinerary', async () => {
     await assertSucceeds(getDoc(doc(db('alice'), `trips/${T}/itinerary/d1`)));

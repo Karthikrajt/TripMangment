@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { WifiOff } from 'lucide-react';
@@ -17,7 +18,8 @@ import { newId } from '../lib/ids';
 import { todayIST } from '../lib/format';
 import { errorMessage } from '../lib/retry';
 import { uploadFile, deleteFile } from '../lib/files';
-import { computeSplits, SPLIT_METHOD_LABELS } from '../domain/split';
+import { computeSplits, SPLIT_METHOD_LABELS, SPLIT_METHODS_OFFERED } from '../domain/split';
+import { ageLabel, weightsOf, weightOf } from '../domain/people';
 import { formatINR, paiseToInput, rupeesToPaise, sumPaise } from '../domain/money';
 import { canEditExpense } from '../domain/permissions';
 import { isISODate } from '../domain/validation';
@@ -42,6 +44,7 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
   const me = useSession((s) => s.member)!;
   const members = useApprovedMembers();
   const allUids = useMemo(() => members.map((m) => m.uid), [members]);
+  const weights = useMemo(() => weightsOf(members), [members]);
   // Generated once per form so double-taps and offline retries map to the same document.
   const idempotencyKey = useRef(existing?.id ?? newId());
 
@@ -50,7 +53,7 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
     category: (existing?.category ?? 'Food') as ExpenseCategory,
     amount: existing ? paiseToInput(existing.amountPaise) : '',
     expenseDate: existing?.expenseDate ?? todayIST(),
-    paidBy: existing?.paidBy ?? me.uid,
+    paidBy: existing?.paidBy ?? personIdOf(me),
     description: existing?.description ?? '',
     splitMethod: (existing?.splitMethod ?? 'equal_all') as SplitMethod,
   });
@@ -64,7 +67,7 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
   const amount = rupeesToPaise(f.values.amount);
   const customPaise = Object.fromEntries(Object.entries(custom).map(([k, v]) => [k, rupeesToPaise(v || '0') ?? -1]));
   const preview = amount
-    ? computeSplits({ method: f.values.splitMethod, amount, allMemberUids: allUids, selectedUids: selected, custom: customPaise })
+    ? computeSplits({ method: f.values.splitMethod, amount, allMemberUids: allUids, selectedUids: selected, custom: customPaise, weights })
     : null;
   const customTotal = sumPaise(selected.map((u) => Math.max(0, customPaise[u] ?? 0)));
 
@@ -135,12 +138,12 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
             </SelectField>
             <TextField label="Expense date" type="date" required {...f.bind('expenseDate')} />
             <SelectField label="Paid by" required {...f.bind('paidBy')}>
-              {members.map((m) => <option key={m.uid} value={m.uid}>{m.displayName}{m.uid === me.uid ? ' (me)' : ''}</option>)}
+              {members.map((m) => <option key={m.uid} value={m.uid}>{m.displayName}{m.uid === personIdOf(me) ? ' (me)' : ''}</option>)}
             </SelectField>
             <TextArea className="sm:col-span-2" label="Description" maxLength={1000} {...f.bind('description')} />
 
             <SelectField className="sm:col-span-2" label="How should this be split?" {...f.bind('splitMethod')}>
-              {(Object.keys(SPLIT_METHOD_LABELS) as SplitMethod[]).map((k) => <option key={k} value={k}>{SPLIT_METHOD_LABELS[k]}</option>)}
+              {[...SPLIT_METHODS_OFFERED, ...(SPLIT_METHODS_OFFERED.includes(f.values.splitMethod) ? [] : [f.values.splitMethod])].map((k) => <option key={k} value={k}>{SPLIT_METHOD_LABELS[k]}</option>)}
             </SelectField>
 
             {(f.values.splitMethod === 'equal_selected' || f.values.splitMethod === 'custom') && (
@@ -170,7 +173,18 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
 
             {preview?.ok && f.values.splitMethod !== 'custom' && (
               <div className="sm:col-span-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
-                Split among {Object.keys(preview.splits).length} member(s): about {formatINR(Math.round(amount! / Object.keys(preview.splits).length))} each.
+                <p className="mb-2 font-medium">
+                  Per head: about {formatINR(Math.round((amount! * 100) / Object.keys(preview.splits).reduce((a, id) => a + (weights[id] ?? 100), 0)))} per adult
+                  {(f.values.splitMethod === 'equal_all' ? members : members.filter((m) => selected.includes(m.uid))).some((m) => weightOf(m) === 0) && ' · infants not counted'}
+                </p>
+                <ul className="max-h-48 space-y-0.5 overflow-y-auto">
+                  {members.filter((m) => m.uid in preview.splits).map((m) => (
+                    <li key={m.uid} className="flex justify-between gap-2">
+                      <span>{m.displayName} <span className="text-slate-500">· {ageLabel(m)}</span></span>
+                      <span className="tabular-nums font-semibold">{formatINR(preview.splits[m.uid])}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

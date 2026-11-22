@@ -1,3 +1,4 @@
+import { personIdOf } from '../domain/people';
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, Receipt, Check, X, Pencil, Trash2, CloudUpload, AlertTriangle, RotateCcw } from 'lucide-react';
@@ -38,14 +39,14 @@ export default function Expenses() {
 
   const approved = data.filter((e) => e.status === 'approved');
   const total = sumPaise(approved.map((e) => e.amountPaise));
-  const myPaid = sumPaise(approved.filter((e) => e.paidBy === me?.uid).map((e) => e.amountPaise));
-  const myShare = sumPaise(approved.map((e) => e.splits[me?.uid ?? ''] ?? 0));
+  const myPaid = sumPaise(approved.filter((e) => e.paidBy === personIdOf(me)).map((e) => e.amountPaise));
+  const myShare = sumPaise(approved.map((e) => e.splits[personIdOf(me)] ?? 0));
   const pendingCount = data.filter((e) => e.status === 'pending').length;
 
   const shown = useMemo(
     () =>
       data.filter((e) => {
-        if (tab === 'mine' && e.createdBy !== me?.uid && e.paidBy !== me?.uid) return false;
+        if (tab === 'mine' && e.createdBy !== me?.uid && e.paidBy !== personIdOf(me) && !(personIdOf(me) in e.splits)) return false;
         if (tab === 'review' && e.status !== 'pending') return false;
         if (category && e.category !== category) return false;
         if (status && tab !== 'review' && e.status !== status) return false;
