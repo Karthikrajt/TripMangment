@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Clock, LogOut, Ban, Send, XCircle } from 'lucide-react';
 import { useSession } from '../store/session';
 import { Button } from '../components/ui/Button';
 import { Card, CardBody } from '../components/ui/Card';
 import { FormError, TextArea, TextField } from '../components/ui/Field';
-import { requestAccess } from '../services/members';
+import { joinTrip, requestAccess } from '../services/members';
 import { errorMessage } from '../lib/retry';
 import { formatDate } from '../lib/format';
 import { isPhone } from '../domain/validation';
@@ -17,6 +17,29 @@ export default function Pending() {
   const [relationship, setRelationship] = useState(member?.relationship ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Open trip (default): join straight away, no admin approval.
+  const open = summary ? summary.openJoin !== false : false;
+  const canJoin = open && user && (!member || member.status === 'pending' || member.status === 'rejected');
+  const tried = useRef(false);
+  const join = async () => {
+    if (!user) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await joinTrip(user, member);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (canJoin && !tried.current) {
+      tried.current = true;
+      void join();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canJoin]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +77,20 @@ export default function Pending() {
 
         <Card>
           <CardBody className="space-y-4">
-            {status === 'pending' && (
+            {canJoin ? (
+              <div className="flex flex-col items-center gap-3 text-center">
+                <h2 className="text-xl font-semibold">{error ? 'Could not join yet' : 'Joining the trip…'}</h2>
+                {error ? (
+                  <>
+                    <FormError message={error} />
+                    <Button size="lg" className="w-full" loading={busy} onClick={join}>Try again</Button>
+                  </>
+                ) : (
+                  <p className="text-slate-600">Setting things up for you. This takes a second.</p>
+                )}
+              </div>
+            ) : null}
+            {!canJoin && status === 'pending' && (
               <div className="flex flex-col items-center gap-3 text-center">
                 <span className="rounded-full bg-amber-100 p-4 text-amber-700">
                   <Clock className="size-8" />
@@ -72,7 +108,7 @@ export default function Pending() {
                 <p className="text-slate-600">Your access to this trip has been turned off by the admin. Please contact them if this is a mistake.</p>
               </div>
             )}
-            {(!member || status === 'rejected') && (
+            {!canJoin && (!member || status === 'rejected') && (
               <form onSubmit={submit} className="space-y-4">
                 {status === 'rejected' ? (
                   <div className="flex items-start gap-3 rounded-xl bg-red-50 p-3 text-red-800">

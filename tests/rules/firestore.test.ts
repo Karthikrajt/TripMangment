@@ -75,14 +75,35 @@ describe('authentication & membership', () => {
     await assertSucceeds(getDoc(doc(db('pete'), `trips/${T}/members/pete`)));
     await assertFails(getDoc(doc(db('pete'), `trips/${T}/members/alice`)));
   });
-  it('lets a new user request access only as a pending member', async () => {
+  it('open trip (default): a new user joins as an approved member without admin approval', async () => {
+    const f = db('joiner');
+    const base = { ...memberDoc('joiner', 'member', 'approved'), email: 'joiner@x.com', requestedAt: serverTimestamp() };
+    await assertFails(setDoc(doc(f, `trips/${T}/members/joiner`), { ...base, role: 'admin' }));
+    await assertSucceeds(setDoc(doc(f, `trips/${T}/members/joiner`), base));
+  });
+  it('closed trip: joining requires approval again', async () => {
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { openJoin: false }));
+    const f = db('joiner');
+    const base = { ...memberDoc('joiner', 'member', 'approved'), email: 'joiner@x.com', requestedAt: serverTimestamp() };
+    await assertFails(setDoc(doc(f, `trips/${T}/members/joiner`), base));
+    await assertSucceeds(setDoc(doc(f, `trips/${T}/members/joiner`), { ...base, status: 'pending' }));
+    await assertFails(updateDoc(doc(db('pete'), `trips/${T}/members/pete`), { status: 'approved' }));
+  });
+  it('open trip: a pending user can join, a disabled user cannot', async () => {
+    await assertSucceeds(updateDoc(doc(db('pete'), `trips/${T}/members/pete`), { status: 'approved', requestedAt: serverTimestamp() }));
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/dan`), memberDoc('dan', 'member', 'disabled')));
+    await assertFails(updateDoc(doc(db('dan'), `trips/${T}/members/dan`), { status: 'approved' }));
+  });
+  it('lets a new user request access only as a pending member (approval required)', async () => {
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { openJoin: false }));
     const f = db('newbie');
     await assertFails(setDoc(doc(f, `trips/${T}/members/newbie`), { ...memberDoc('newbie', 'admin', 'pending'), email: 'newbie@x.com', requestedAt: serverTimestamp() }));
     await assertFails(setDoc(doc(f, `trips/${T}/members/newbie`), { ...memberDoc('newbie', 'member', 'approved'), email: 'newbie@x.com', requestedAt: serverTimestamp() }));
     await assertFails(setDoc(doc(f, `trips/${T}/members/other`), { ...memberDoc('other', 'member', 'pending'), requestedAt: serverTimestamp() }));
     await assertSucceeds(setDoc(doc(f, `trips/${T}/members/newbie`), { ...memberDoc('newbie', 'member', 'pending'), email: 'newbie@x.com', requestedAt: serverTimestamp() }));
   });
-  it('prevents members from approving themselves or others', async () => {
+  it('prevents members from approving themselves or others (approval required)', async () => {
+    await env.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), `trips/${T}`), { openJoin: false }));
     await assertFails(updateDoc(doc(db('pete'), `trips/${T}/members/pete`), { status: 'approved' }));
     await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/pete`), { status: 'approved' }));
     await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/alice`), { role: 'admin' }));
@@ -150,6 +171,30 @@ describe('travellers without login', () => {
     await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, childSharePercent: 120 }));
     await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, infantSharePercent: 2.5 }));
     await assertFails(updateDoc(doc(db('alice'), `trips/${T}`), { ...base, childSharePercent: 0 }));
+  });
+  it('a member can claim an unclaimed traveller as themselves (both sides in one batch)', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/kid1`), traveller({ ageGroup: 'adult', shareWeight: 100 })));
+    const f = db('alice');
+    // one side alone is refused
+    await assertFails(updateDoc(doc(f, `trips/${T}/members/alice`), { personId: 'kid1' }));
+    await assertFails(updateDoc(doc(f, `trips/${T}/members/kid1`), { linkedUid: 'alice' }));
+    const b = writeBatch(f);
+    b.update(doc(f, `trips/${T}/members/alice`), { personId: 'kid1', linkDecided: true });
+    b.update(doc(f, `trips/${T}/members/kid1`), { linkedUid: 'alice' });
+    await assertSucceeds(b.commit());
+  });
+  it('cannot claim a traveller someone already claimed, or change other fields while claiming', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/kid1`), traveller({ linkedUid: 'bob' })));
+    const f = db('alice');
+    const b = writeBatch(f);
+    b.update(doc(f, `trips/${T}/members/alice`), { personId: 'kid1' });
+    b.update(doc(f, `trips/${T}/members/kid1`), { linkedUid: 'alice' });
+    await assertFails(b.commit());
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/kid2`), { ...traveller(), uid: 'kid2' }));
+    const b2 = writeBatch(f);
+    b2.update(doc(f, `trips/${T}/members/alice`), { personId: 'kid2' });
+    b2.update(doc(f, `trips/${T}/members/kid2`), { linkedUid: 'alice', shareWeight: 0 });
+    await assertFails(b2.commit());
   });
   it('admin can link a sign-in account to a traveller', async () => {
     await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/members/alice`), { personId: 'kid1' }));

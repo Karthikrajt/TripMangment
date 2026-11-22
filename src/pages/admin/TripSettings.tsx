@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Lock, Users } from 'lucide-react';
+import { Plus, Trash2, Lock, Users, UserPlus } from 'lucide-react';
 import { sharesFromTrip } from '../../domain/people';
 import { useSession } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -49,6 +49,7 @@ export default function TripSettings() {
         emergencyInfo: v.emergencyInfo.trim(),
         importantContacts: contacts.map((c) => ({ name: c.name.trim(), phone: c.phone.trim(), note: (c.note ?? '').trim() })),
         ticketsLocked: v.ticketsLocked,
+        openJoin: v.openJoin !== false,
       });
       toast.success('Trip settings saved');
     } catch (err) {
@@ -89,6 +90,17 @@ export default function TripSettings() {
               <Button variant="secondary" size="sm" icon={<Plus className="size-4" />} onClick={() => setV({ ...v, importantContacts: [...v.importantContacts, { name: '', phone: '', note: '' }] })}>Add contact</Button>
             )}
           </div>
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader icon={<UserPlus className="size-5" />} title="Joining the trip" />
+        <CardBody>
+          <Checkbox
+            label="Anyone with the app link can join (no approval)"
+            description="New people sign in with Google and join straight away, then confirm which traveller they are. Anyone who gets the link can see trip tickets and details. Turn this off to approve each new person under Member Approvals."
+            checked={v.openJoin !== false}
+            onChange={(x) => setV({ ...v, openJoin: x })}
+          />
         </CardBody>
       </Card>
       <Card>

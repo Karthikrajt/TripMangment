@@ -8,6 +8,8 @@ export const tripRef = () => doc(db, tripPath());
 export const publicSummaryRef = () => doc(db, tripPath('public', 'summary'));
 
 export interface PublicSummary {
+  /** mirrors trip.openJoin so people who have not joined yet know whether approval is needed */
+  openJoin?: boolean;
   name: string;
   destination: string;
   startDate: string;
@@ -20,7 +22,7 @@ export async function getPublicSummary(): Promise<PublicSummary | null> {
 }
 
 export type TripInput = Pick<Trip, 'name' | 'destination' | 'description' | 'startDate' | 'endDate' | 'emergencyInfo' | 'importantContacts' | 'ticketsLocked'> &
-  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent'>>;
+  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent' | 'openJoin'>>;
 
 /** First-run setup by the bootstrap admin: trip + public summary + admin membership, atomically. */
 export async function createTrip(user: User, input: TripInput): Promise<void> {
@@ -48,6 +50,6 @@ export async function createTrip(user: User, input: TripInput): Promise<void> {
 
 export async function updateTrip(before: Trip, input: TripInput): Promise<void> {
   await updateDoc(tripRef(), { ...input, updatedAt: serverTimestamp() });
-  await setDoc(publicSummaryRef(), { name: input.name, destination: input.destination, startDate: input.startDate, endDate: input.endDate });
+  await setDoc(publicSummaryRef(), { name: input.name, destination: input.destination, startDate: input.startDate, endDate: input.endDate, openJoin: input.openJoin ?? before.openJoin ?? true });
   await logAudit('update', 'trip', before.id, `Updated trip settings`, strip(before as never), input as never);
 }

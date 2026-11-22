@@ -45,6 +45,9 @@ Every traveller is a document in `members`:
 
 ### Membership and approval
 
+**Open joining (default).** With `trip.openJoin` true or absent, a signed-in user can create their own member document as `approved` / `member` straight away, or move their own `pending`/`rejected` document to `approved`. A `disabled` user can't. They can then claim one *unclaimed* traveller (`hasLogin == false`, no `linkedUid`). The rules only accept the claim as one batch that sets both their `personId` and the traveller's `linkedUid`, and no other fields. Anyone who has the app link can join and see trip data while this is on. Admins can turn it off in Trip Settings, which brings back the approval flow described below.
+
+
 - A new user can only create **their own** member document, with `status: 'pending'`, `role: 'member'`, their verified Google email and a server timestamp.
 - The owner (bootstrap admin) creates the trip and their own approved admin membership in one atomic batch. The rules confirm `ownerUid` via `getAfter`.
 - Members can edit only profile fields (name, phone, emergency contact, family). They cannot change their own `role` or `status`.

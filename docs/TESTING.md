@@ -12,6 +12,8 @@
 ## Manual (before each trip)
 
 ### Authentication
+- [ ] Open joining (default): a new Google user joins without approval; "Are you …?" suggests the right traveller by email or name; Yes connects them (Profile shows "You are …"); "No" → list → confirm; "I'm not on the list" → choose family
+- [ ] Trip Settings → turn off "Anyone with the app link can join": new users see the request screen and need approval again
 - [ ] Google login works on desktop Chrome, Android Chrome and iPhone Safari (also in installed PWA mode)
 - [ ] First login creates `users/{uid}`
 - [ ] New user sees "Request to join", submits, and the admin gets a notification

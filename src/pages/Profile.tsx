@@ -18,6 +18,7 @@ import { clearSyncState } from '../lib/sync';
 import { formatBytes } from '../lib/format';
 import { errorMessage } from '../lib/retry';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
+import { useWhoAreYou } from '../components/WhoAreYou';
 
 export default function Profile() {
   const { member, signOut } = useSession();
@@ -27,6 +28,9 @@ export default function Profile() {
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState<OfflineFile[]>([]);
   const install = useInstallPrompt();
+  const openWho = useWhoAreYou((s) => s.open);
+  const members = useSession((s) => s.members);
+  const linkedTo = member?.personId ? members.find((m) => m.uid === member.personId) : undefined;
 
   useEffect(() => {
     pushSupported().then(setPushOk);
@@ -79,9 +83,13 @@ export default function Profile() {
             <div className="mt-1 flex flex-wrap justify-center gap-2 sm:justify-start">
               <Badge tone={member.role === 'admin' ? 'violet' : 'brand'}>{member.role === 'admin' ? 'Trip admin' : 'Trip member'}</Badge>
               {member.relationship && <Badge>{member.relationship}</Badge>}
+              {linkedTo && <Badge tone="sky">You are {linkedTo.displayName}</Badge>}
             </div>
           </div>
-          <Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEditing(true)}>Edit details</Button>
+          <div className="flex flex-col gap-2">
+            <Button variant="secondary" icon={<Pencil className="size-4" />} onClick={() => setEditing(true)}>Edit details</Button>
+            {!member.personId && <Button variant="ghost" onClick={openWho}>Which traveller are you?</Button>}
+          </div>
         </CardBody>
         <CardBody className="grid gap-3 border-t border-slate-100 sm:grid-cols-2">
           <div><p className="text-sm text-slate-500">Mobile</p><p className="font-medium">{member.phone || 'Not added'}</p></div>

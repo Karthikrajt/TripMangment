@@ -7,6 +7,7 @@ import { Toaster } from './components/ui/Toast';
 import { ConfirmHost } from './components/ui/Confirm';
 import { UpdatePrompt } from './components/UpdatePrompt';
 import { DocViewerHost } from './components/DocViewer';
+import { WhoAreYou } from './components/WhoAreYou';
 import { env, missingConfig } from './config/env';
 import Login from './pages/Login';
 import Pending from './pages/Pending';
@@ -61,6 +62,7 @@ function Gate() {
 function ApprovedApp() {
   return (
     <AppShell>
+      <WhoAreYou />
       <Suspense fallback={<Spinner />}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
