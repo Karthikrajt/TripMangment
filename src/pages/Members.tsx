@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Mail, Phone, Pencil, Shield, ShieldOff, UserX, UserCheck, Trash2, Users, UserPlus, LogIn, Baby, Plus, LayoutList, Columns3 } from 'lucide-react';
-import { FamilyBoard } from '../components/FamilyBoard';
+import { Mail, Phone, Pencil, Shield, ShieldOff, UserX, UserCheck, Trash2, Users, UserPlus, LogIn, Baby, Plus, LayoutList, UsersRound } from 'lucide-react';
+import { FamilyManager } from '../components/FamilyManager';
 import { useSession, useIsAdmin, useShareDefaults } from '../store/session';
 import { useExpenses, useRooms, useTickets } from '../hooks/data';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -30,14 +30,14 @@ export default function Members() {
   const rooms = useRooms();
   const [editing, setEditing] = useState<{ person: Member | null; family?: string } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [view, setViewState] = useState<'list' | 'board'>(() => {
+  const [view, setViewState] = useState<'list' | 'families'>(() => {
     try {
-      return localStorage.getItem('tm.membersView') === 'board' ? 'board' : 'list';
+      return localStorage.getItem('tm.membersView') === 'families' ? 'families' : 'list';
     } catch {
       return 'list';
     }
   });
-  const setView = (v: 'list' | 'board') => {
+  const setView = (v: 'list' | 'families') => {
     setViewState(v);
     try {
       localStorage.setItem('tm.membersView', v);
@@ -90,15 +90,15 @@ export default function Members() {
       )}
       {admin && people.length > 0 && (
         <div className="mb-4 inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="View">
-          {([['list', 'List', LayoutList], ['board', 'Family board', Columns3]] as const).map(([k, label, Icon]) => (
+          {([['list', 'People', LayoutList], ['families', 'Families', UsersRound]] as const).map(([k, label, Icon]) => (
             <button key={k} role="tab" aria-selected={view === k} onClick={() => setView(k)} className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold ${view === k ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-600'}`}>
               <Icon className="size-4" /> {label}
             </button>
           ))}
         </div>
       )}
-      {admin && view === 'board' && people.length > 0 ? (
-        <FamilyBoard people={people} shareDefaults={shareDefaults} />
+      {admin && view === 'families' && people.length > 0 ? (
+        <FamilyManager people={people} shareDefaults={shareDefaults} onRename={setRenaming} />
       ) : people.length === 0 ? <EmptyState icon={<Users className="size-7" />} title="No travellers yet" action={admin && <Button onClick={() => setEditing({ person: null })}>Add traveller</Button>} /> : (
         <div className="space-y-6">
           {groups.map(({ name: group, members: ms }) => (

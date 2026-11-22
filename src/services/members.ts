@@ -155,10 +155,15 @@ export async function renameFamily(from: string, to: string, members: Member[]) 
   await logAudit('update', 'family', target, `Renamed family “${from}” to “${target}” (${affected.length} people)`);
 }
 
-/** Move one person to a family ('' = no family). Used by the drag-and-drop board. */
-export async function setFamily(m: Member, family: string) {
+/** Move people to a family ('' = no family) in one batch, with one audit entry. */
+export async function moveToFamily(people: Member[], family: string) {
   const name = family.trim().replace(/\s+/g, ' ').slice(0, 100);
-  if (familyOf(m) === name) return;
-  await updateDoc(ref(m.uid), { relationship: name, updatedAt: serverTimestamp() });
-  await logAudit('update', 'family', m.uid, `Moved ${m.displayName} ${name ? `to “${name}”` : 'out of their family'}${familyOf(m) ? ` (was “${familyOf(m)}”)` : ''}`, { relationship: m.relationship }, { relationship: name });
+  const changing = people.filter((m) => familyOf(m) !== name);
+  if (!changing.length) return 0;
+  const b = writeBatch(db);
+  for (const m of changing) b.update(ref(m.uid), { relationship: name, updatedAt: serverTimestamp() });
+  await b.commit();
+  const who = changing.map((m) => m.displayName).join(', ');
+  await logAudit('update', 'family', name || '(none)', `${name ? `Added to “${name}”` : 'Removed from their family'}: ${who}`.slice(0, 500));
+  return changing.length;
 }

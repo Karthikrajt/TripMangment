@@ -229,42 +229,38 @@ try {
   await shot(admin, 'expense-family-chip');
   ok('Whole-family select in the expense form: 75% + 10% split ₹850 as ₹750 / ₹100');
 
-  // 12. Family board: drag and drop between families (made-up names)
+  // 12. Families view: tap-only family management (made-up names)
   await admin.goto(`${BASE}/members`);
-  await admin.getByRole('tab', { name: 'Family board' }).click();
-  const col = (name) => admin.getByRole('listitem', { name, exact: true });
-  await col('Test Family').waitFor();
-  async function drag(person, target) {
-    const from = await admin.getByRole('button', { name: new RegExp(`^${person}\\.`) }).boundingBox();
-    const to = await col(target).boundingBox();
-    await admin.mouse.move(from.x + 40, from.y + from.height / 2);
-    await admin.mouse.down();
-    await admin.mouse.move(from.x + 60, from.y + from.height / 2 + 10, { steps: 5 });
-    await admin.mouse.move(to.x + to.width / 2, to.y + 60, { steps: 15 });
-    await admin.mouse.up();
-  }
-  await drag('Kavin \\(kid\\)', 'Test Family');
-  await col('Test Family').getByText('Kavin (kid)').waitFor();
-  await shot(admin, 'family-board');
-  ok('Dragged a person into another family on the board');
+  await admin.getByRole('tab', { name: 'Families' }).click();
+  const famCard = (name) => admin.getByRole('region', { name, exact: true });
+  await famCard('People without a family').waitFor();
+  await famCard('People without a family').getByRole('button', { name: 'Kavin (kid)' }).click();
+  await admin.getByRole('dialog', { name: 'Move Kavin (kid) to…' }).getByRole('button', { name: 'Test Family' }).click();
+  await famCard('Test Family').getByText('Kavin (kid)').waitFor();
+  await shot(admin, 'families-view');
+  ok('Tap a person without a family → Move to… → Test Family');
 
-  await drag('Baby Nila', 'New family');
+  await admin.getByRole('button', { name: 'New family' }).first().click();
   await admin.getByLabel('Family name').fill('Sample Family');
-  await admin.getByRole('button', { name: 'Create & move' }).click();
-  await col('Sample Family').getByText('Baby Nila').waitFor();
-  ok('Dropping on "New family" asks for a name and creates the family');
+  const dlg = admin.getByRole('dialog', { name: 'New family' });
+  await dlg.getByRole('checkbox', { name: /Baby Nila/ }).check();
+  await dlg.getByRole('checkbox', { name: /Bob Uncle/ }).check();
+  await dlg.getByRole('button', { name: 'Create with 2 people' }).click();
+  await famCard('Sample Family').getByText('Baby Nila').waitFor();
+  await famCard('Sample Family').getByText('Bob Uncle').waitFor();
+  ok('New family with name and ticked members in one step');
 
-  await admin.getByLabel('Move Kavin (kid) to family').selectOption('');
-  await col('No family').getByText('Kavin (kid)').waitFor();
-  ok('"Move to" menu works without dragging');
+  await famCard('Kumar family').getByRole('button', { name: 'Add people to Kumar family' }).click();
+  const add = admin.getByRole('dialog', { name: 'Add people to Kumar family' });
+  await add.getByRole('checkbox', { name: /Ravi Kumar/ }).check();
+  await add.getByRole('button', { name: 'Add 1 to Kumar family' }).click();
+  await famCard('Kumar family').getByText('Ravi Kumar').waitFor();
+  ok('"Add people" checklist adds people to a family');
 
-  // keyboard: focus card, space to pick up, arrow right to next column, space to drop
-  await admin.getByRole('button', { name: /^Bob Uncle\./ }).focus();
-  await admin.keyboard.press('Space');
-  await admin.keyboard.press('ArrowRight');
-  await admin.keyboard.press('Space');
-  await admin.waitForTimeout(500);
-  ok('Keyboard drag does not crash (space / arrows / space)');
+  await famCard('Test Family').getByRole('button', { name: /Kavin \(kid\) – move/ }).click();
+  await admin.getByRole('dialog', { name: 'Move Kavin (kid) to…' }).getByRole('button', { name: 'No family' }).click();
+  await famCard('People without a family').getByText('Kavin (kid)').waitFor();
+  ok('Move to "No family" puts the person back in the unassigned list');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);
