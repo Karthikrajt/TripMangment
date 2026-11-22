@@ -36,7 +36,7 @@ Calendar dates are stored as `YYYY-MM-DD` and times as `HH:mm`, both in IST, so 
 
 Every traveller is a document in `members`:
 
-- **Admin-added travellers** have a random id (`p_…`), `hasLogin: false`, `status: 'approved'`, an optional email, `ageGroup` (`adult`/`child`/`infant`) and `shareWeight` (adult 100, child set by the admin, for example 50, infant always 0). Nobody can sign in as them, because their id is never a Firebase Auth uid.
+- **Admin-added travellers** have a random id (`p_…`), `hasLogin: false`, `status: 'approved'`, an optional email, `ageGroup` (`adult`/`child`/`infant`) and, optionally, their own share (`customShare: true` + `shareWeight`). Adults are always 100%. Children and infants otherwise use the trip defaults `childSharePercent` / `infantSharePercent` (Trip Settings, default 50 / 0). The family name is stored in `relationship`. Nobody can sign in as them, because their id is never a Firebase Auth uid.
 - **Sign-in accounts** are keyed by the Firebase uid. When the admin approves one, they can link it to an existing traveller (`personId` on the account, `linkedUid` on the traveller). The account then acts as that traveller: "my tickets", "my room" and "my balance" use the traveller's id, and the account is hidden from people lists.
 - Only admins can create travellers, link accounts, or set age group and share. A user cannot claim a traveller, reduce their own share, or create a traveller. 8 rule tests cover this.
 

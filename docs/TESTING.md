@@ -35,6 +35,8 @@
 - [ ] "Save for offline", then airplane mode, then "Open offline copy" works. Profile lists the copy and can remove it
 
 ### Expenses
+- [ ] Trip Settings: change child/infant default %. People without their own % follow it in new expenses; saved expenses keep their split
+- [ ] Family groups: add a person to a family from the family header, rename a family, select a whole family in an expense or ticket, and check Settlement → By family
 - [ ] Admin adds a child at 50% and an infant without email. A ₹1,000 "everyone" expense with 3 adults + 1 child splits ₹285.71 / ₹142.86 and the infant ₹0
 - [ ] A family member signs in, and the admin links them to their existing traveller on approval. Their balance and tickets show correctly
 - [ ] Equal split across all members, including remainder paise (₹100 / 3)

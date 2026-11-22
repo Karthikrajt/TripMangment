@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeSettlement, suggestTransfers } from './settlement';
+import { computeSettlement, familyBalances, suggestTransfers } from './settlement';
 import type { Expense, Settlement } from './types';
 
 const exp = (p: Partial<Expense>): Expense =>
@@ -88,5 +88,23 @@ describe('suggestTransfers', () => {
     }
     expect(Object.values(net).every((v) => v === 0)).toBe(true);
     expect(t.length).toBeLessThanOrEqual(3);
+  });
+});
+
+describe('familyBalances', () => {
+  it('sums members per family and keeps no-family last', () => {
+    const fam: Record<string, string> = { a: 'Alpha Family', b: 'alpha family', c: '' };
+    const r = familyBalances(
+      [
+        { uid: 'a', paid: 1000, share: 400, settledIn: 0, settledOut: 0, net: 600, outstanding: 600 },
+        { uid: 'b', paid: 0, share: 300, settledIn: 0, settledOut: 0, net: -300, outstanding: -300 },
+        { uid: 'c', paid: 0, share: 300, settledIn: 0, settledOut: 0, net: -300, outstanding: -300 },
+      ],
+      (u) => fam[u],
+    );
+    expect(r).toEqual([
+      { family: 'Alpha Family', uids: ['a', 'b'], paid: 1000, share: 700, outstanding: 300 },
+      { family: '', uids: ['c'], paid: 0, share: 300, outstanding: -300 },
+    ]);
   });
 });

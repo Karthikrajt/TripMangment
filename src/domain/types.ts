@@ -26,6 +26,9 @@ export interface Trip {
   emergencyInfo: string;
   importantContacts: { name: string; phone: string; note?: string }[];
   ticketsLocked: boolean;
+  /** Default share for children / infants, percent of an adult (adult is always 100). */
+  childSharePercent?: number;
+  infantSharePercent?: number;
   createdAt: TS;
   updatedAt: TS;
 }
@@ -52,8 +55,10 @@ export interface Member {
    * (the account then acts as that person and is hidden from people lists).
    */
   ageGroup?: AgeGroup;
-  /** Per-head share in percent: adult 100, child e.g. 50, infant 0. */
+  /** Custom per-head share in percent; used only when `customShare` is true. */
   shareWeight?: number;
+  /** true = use `shareWeight`; false/absent = use the trip default for the age group. */
+  customShare?: boolean;
   hasLogin?: boolean;
   personId?: string;
   /** On a traveller: the sign-in account linked to it. */

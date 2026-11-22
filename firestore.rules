@@ -45,6 +45,7 @@ service cloud.firestore {
     function optStr(d, k, max) { return !(k in d) || str(d[k], max); }
     function isDate(v) { return v is string && (v == '' || v.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')); }
     function isTime(v) { return v is string && (v == '' || v.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')); }
+    function pct(d, k) { return !(k in d) || (d[k] is int && d[k] >= 0 && d[k] <= 100); }
     function strList(v, max) { return v is list && v.size() <= max; }
     function filePathFor(tripId, kind, v) {
       return v == '' || (v is string && v.matches('^trips/' + tripId + '/' + kind + '/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+[.][a-z0-9]+$'));
@@ -77,7 +78,8 @@ service cloud.firestore {
         && str(incoming().description, 2000) && str(incoming().emergencyInfo, 2000)
         && isDate(incoming().startDate) && isDate(incoming().endDate)
         && strList(incoming().importantContacts, 30)
-        && incoming().ticketsLocked is bool;
+        && incoming().ticketsLocked is bool
+        && pct(incoming(), 'childSharePercent') && pct(incoming(), 'infantSharePercent');
       allow delete: if false;
 
       // Minimal public summary so signed-in, not-yet-approved users can see
@@ -93,7 +95,7 @@ service cloud.firestore {
         function isSelf() { return signedIn() && uid() == memberId; }
         function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'updatedAt']; }
         function validMember(d) {
-          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'hasLogin', 'personId', 'linkedUid'])
+          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'customShare', 'hasLogin', 'personId', 'linkedUid'])
             && d.uid == memberId
             && str(d.displayName, 100) && str(d.email, 200) && str(d.photoURL, 1000)
             && str(d.phone, 30) && str(d.emergencyContact, 200) && str(d.relationship, 100)
@@ -102,6 +104,7 @@ service cloud.firestore {
             && d.status in ['pending', 'approved', 'rejected', 'disabled']
             && (!('ageGroup' in d) || d.ageGroup in ['adult', 'child', 'infant'])
             && (!('shareWeight' in d) || (d.shareWeight is int && d.shareWeight >= 0 && d.shareWeight <= 100))
+            && (!('customShare' in d) || d.customShare is bool)
             && (!('hasLogin' in d) || d.hasLogin is bool)
             && (!('personId' in d) || str(d.personId, 128))
             && (!('linkedUid' in d) || str(d.linkedUid, 128));
@@ -111,6 +114,7 @@ service cloud.firestore {
           return (!('personId' in d) || d.personId == '')
             && (!('ageGroup' in d) || d.ageGroup == 'adult')
             && (!('shareWeight' in d) || d.shareWeight == 100)
+            && (!('customShare' in d) || d.customShare == false)
             && (!('linkedUid' in d) || d.linkedUid == '');
         }
         function isOwnerTarget() { return trip(tripId).ownerUid == memberId; }

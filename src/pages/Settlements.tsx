@@ -1,6 +1,6 @@
-import { personIdOf, peopleOf } from '../domain/people';
+import { familyOf, personIdOf, peopleOf } from '../domain/people';
 import { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Scale, Trash2, AlertTriangle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Scale, Trash2, AlertTriangle, Users } from 'lucide-react';
 import { useExpenses, useSettlements } from '../hooks/data';
 import { useIsAdmin, useSession, memberName } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -12,7 +12,7 @@ import { FormError, TextField } from '../components/ui/Field';
 import { Avatar } from '../components/ui/Avatar';
 import { confirm } from '../components/ui/Confirm';
 import { toast } from '../components/ui/Toast';
-import { computeSettlement, type Transfer } from '../domain/settlement';
+import { computeSettlement, familyBalances, type Transfer } from '../domain/settlement';
 import { formatINR, paiseToInput, rupeesToPaise } from '../domain/money';
 import { deleteSettlement, recordSettlement, updateSettlement } from '../services/expenses';
 import { formatDate, todayIST } from '../lib/format';
@@ -31,6 +31,10 @@ export default function Settlements() {
   const myId = personIdOf(me);
   const summary = useMemo(() => computeSettlement(expenses.data, settlements.data, memberUids), [expenses.data, settlements.data, memberUids]);
   const mine = summary.balances.find((b) => b.uid === myId);
+  const families = useMemo(() => {
+    const byId = new Map(members.map((m) => [m.uid, familyOf(m)]));
+    return familyBalances(summary.balances, (uid) => byId.get(uid) ?? '');
+  }, [summary.balances, members]);
 
   if (expenses.loading || settlements.loading) return <Spinner />;
 
@@ -124,6 +128,25 @@ export default function Settlements() {
           </table>
         </div>
       </Card>
+
+      {families.length > 1 && (
+        <Card>
+          <CardHeader icon={<Users className="size-5" />} title="By family" subtitle="Each family's members added together." />
+          <ul className="divide-y divide-slate-100 tabular-nums">
+            {families.map((f) => (
+              <li key={f.family || '__none'} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  <p className="font-semibold">{f.family || 'No family'} <span className="text-sm font-normal text-slate-500">({f.uids.length})</span></p>
+                  <p className="text-sm text-slate-600">Paid {formatINR(f.paid)} · Share {formatINR(f.share)}</p>
+                </div>
+                <div className="font-semibold">
+                  {f.outstanding === 0 ? <Badge tone="green">Settled</Badge> : f.outstanding > 0 ? <span className="text-emerald-700">Receive {formatINR(f.outstanding)}</span> : <span className="text-red-700">Pay {formatINR(-f.outstanding)}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card>
         <CardHeader icon={<CheckCircle2 className="size-5" />} title="Settlement records" subtitle="Kept separately from expenses." />

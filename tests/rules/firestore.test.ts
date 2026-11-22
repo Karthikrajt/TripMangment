@@ -134,6 +134,23 @@ describe('travellers without login', () => {
     await assertFails(setDoc(doc(f, `trips/${T}/members/newbie`), { ...base, personId: 'kid1' }));
     await assertFails(setDoc(doc(f, `trips/${T}/members/newbie`), { ...base, ageGroup: 'infant' }));
   });
+  it('admin can give a traveller a custom share; members cannot', async () => {
+    await env.withSecurityRulesDisabled((ctx) => setDoc(doc(ctx.firestore(), `trips/${T}/members/kid1`), traveller()));
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/members/kid1`), { customShare: true, shareWeight: 70 }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/kid1`), { customShare: true, shareWeight: 0 }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/alice`), { customShare: true }));
+    await assertFails(updateDoc(doc(db('owner'), `trips/${T}/members/kid1`), { customShare: 'yes' }));
+  });
+  it('admin can rename a family across members', async () => {
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/members/alice`), { relationship: 'Test Family' }));
+  });
+  it('trip share defaults: admin only, 0–100', async () => {
+    const base = { name: 'Trip', destination: 'Ooty', description: '', emergencyInfo: '', importantContacts: [], startDate: '', endDate: '', ticketsLocked: false };
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, childSharePercent: 60, infantSharePercent: 10 }));
+    await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, childSharePercent: 120 }));
+    await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, infantSharePercent: 2.5 }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}`), { ...base, childSharePercent: 0 }));
+  });
   it('admin can link a sign-in account to a traveller', async () => {
     await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/members/alice`), { personId: 'kid1' }));
   });

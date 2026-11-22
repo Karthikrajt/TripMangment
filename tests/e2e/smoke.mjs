@@ -182,6 +182,52 @@ try {
   await bob.getByText('₹285.71').first().waitFor();
   await shot(bob, 'bob-linked-settlement');
   ok('Sign-in linked to an existing traveller sees that traveller’s share as their own');
+
+  // 11. Trip-level share defaults + family groups (made-up names)
+  await admin.goto(`${BASE}/admin/settings`);
+  await admin.getByLabel('Child (default %)').fill('40');
+  await admin.getByLabel('Infant (default %)').fill('10');
+  await admin.getByRole('button', { name: 'Save changes' }).click();
+  await admin.getByText('Trip settings saved').waitFor();
+  await admin.goto(`${BASE}/members`);
+  await admin.getByText('Child · 40%').first().waitFor();
+  await admin.getByText('Infant · 10%').first().waitFor();
+  ok('Trip Settings defaults (child 40%, infant 10%) apply to people without their own %');
+
+  await admin.getByRole('button', { name: 'Add traveller' }).first().click();
+  await admin.getByLabel('Full name').fill('Asha Test');
+  await admin.getByLabel('Family', { exact: true }).selectOption('__new');
+  await admin.getByLabel('New family name').fill('Test Family');
+  await admin.getByLabel('Age group').selectOption('child');
+  await admin.getByLabel(/Use the trip default/).uncheck();
+  await admin.getByLabel(/Share for Asha Test/).fill('75');
+  await admin.getByRole('button', { name: 'Add', exact: true }).click();
+  await admin.getByRole('heading', { name: 'Test Family', exact: true }).waitFor();
+  await admin.getByRole('button', { name: 'Add to family' }).first().waitFor();
+  // add a second member straight into the family from its header
+  await admin.getByRole('heading', { name: 'Test Family', exact: true }).locator('xpath=..').getByRole('button', { name: 'Add to family' }).click();
+  await admin.getByRole('dialog', { name: 'Add to Test Family' }).waitFor();
+  await admin.getByLabel('Full name').fill('Baby Test');
+  await admin.getByLabel('Age group').selectOption('infant');
+  await admin.getByRole('button', { name: 'Add', exact: true }).click();
+  await admin.getByText('Baby Test').waitFor();
+  await admin.getByText('Child · 75% (own %)').waitFor();
+  const famSection = await admin.getByRole('heading', { name: 'Test Family', exact: true }).locator('xpath=../..').innerText();
+  if (!famSection.includes('Baby Test') || !famSection.includes('Asha Test')) throw new Error('family section missing members: ' + famSection);
+  await shot(admin, 'members-families');
+  ok('Family created; second member added from the family header; child has own 75%');
+
+  await admin.goto(`${BASE}/expenses/new`);
+  await admin.getByLabel('Expense title').fill('Family snacks');
+  await admin.getByLabel('Amount (₹)').fill('850');
+  await admin.getByLabel('How should this be split?').selectOption('equal_selected');
+  await admin.getByRole('group', { name: /Members included/ }).getByRole('button', { name: 'Clear all' }).click();
+  await admin.getByRole('button', { name: /^Test Family/ }).click();
+  await shot(admin, 'expense-family-chip');
+  const fam = await admin.locator('div.rounded-xl', { hasText: 'Per head' }).last().innerText();
+  if (!fam.includes('₹750') || !fam.includes('₹100')) throw new Error('unexpected family split: ' + fam);
+  await shot(admin, 'expense-family-chip');
+  ok('Whole-family select in the expense form: 75% + 10% split ₹850 as ₹750 / ₹100');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

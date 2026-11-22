@@ -98,3 +98,27 @@ export function suggestTransfers(balances: Pick<MemberBalance, 'uid' | 'outstand
   }
   return out;
 }
+
+export interface FamilyBalance {
+  family: string; // '' = people without a family
+  uids: string[];
+  paid: Paise;
+  share: Paise;
+  outstanding: Paise;
+}
+
+/** Sum member balances per family. `familyOf` maps a person id to a family name ('' = none). */
+export function familyBalances(balances: MemberBalance[], familyOf: (uid: string) => string): FamilyBalance[] {
+  const map = new Map<string, FamilyBalance>();
+  for (const b of balances) {
+    const name = familyOf(b.uid);
+    const key = name.toLowerCase();
+    let f = map.get(key);
+    if (!f) map.set(key, (f = { family: name, uids: [], paid: 0, share: 0, outstanding: 0 }));
+    f.uids.push(b.uid);
+    f.paid += b.paid;
+    f.share += b.share;
+    f.outstanding += b.outstanding;
+  }
+  return [...map.values()].sort((a, b) => (!a.family ? 1 : !b.family ? -1 : a.family.localeCompare(b.family)));
+}

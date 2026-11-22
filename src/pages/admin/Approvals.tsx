@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Check, X, UserCheck } from 'lucide-react';
-import { useSession } from '../../store/session';
+import { useSession, useShareDefaults } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
@@ -17,6 +17,7 @@ import type { Member, MemberStatus } from '../../domain/types';
 export default function Approvals() {
   const { members, member: me } = useSession();
   const [busy, setBusy] = useState<string | null>(null);
+  const shareDefaults = useShareDefaults();
   const [linkChoice, setLinkChoice] = useState<Record<string, string>>({});
   const pending = members.filter((m) => m.status === 'pending').sort((a, b) => (a.requestedAt?.toMillis() ?? 0) - (b.requestedAt?.toMillis() ?? 0));
   const decided = members.filter((m) => m.status === 'rejected' || m.status === 'disabled');
@@ -67,7 +68,7 @@ export default function Approvals() {
               <SelectField label="Who is this?" value={choice(m)} onChange={(e) => setLinkChoice({ ...linkChoice, [m.uid]: e.target.value })}
                 hint={unlinked.length ? 'Pick their name if you already added them as a traveller, so their expenses and tickets stay together.' : undefined}>
                 <option value="">A new traveller (adult)</option>
-                {unlinked.map((p) => <option key={p.uid} value={p.uid}>{p.displayName} · {ageLabel(p)}{p.relationship ? ` · ${p.relationship}` : ''}</option>)}
+                {unlinked.map((p) => <option key={p.uid} value={p.uid}>{p.displayName} · {ageLabel(p, shareDefaults)}{p.relationship ? ` · ${p.relationship}` : ''}</option>)}
               </SelectField>
               <div className="flex justify-end gap-2">
                 <Button variant="danger" icon={<X className="size-5" />} loading={busy === m.uid + 'rejected'} onClick={() => decide(m, 'rejected')}>Reject</Button>
