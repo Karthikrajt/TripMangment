@@ -7,9 +7,9 @@ const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 
 const svg = readFileSync('public/favicon.svg', 'utf8');
-const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').replace(/<rect width="512" height="512" rx="112" fill="#0f766e"\/>/, '');
-const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0f766e"/><g transform="translate(64 64) scale(0.75)">${inner}</g></svg>`;
-const appleTouch = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0f766e"/>${inner}</svg>`;
+const inner = svg.replace(/^[\s\S]*?<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').replace(/<defs>[\s\S]*?<\/defs>/, '').replace(/<rect width="512" height="512" rx="112"[^>]*\/>/, '');
+const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#2453ff"/><g transform="translate(64 64) scale(0.75)">${inner}</g></svg>`;
+const appleTouch = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#2453ff"/>${inner}</svg>`;
 const badge = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path d="M60 380 L190 220 L270 310 L330 250 L452 380 Z" fill="#fff"/><circle cx="380" cy="140" r="52" fill="#fff"/></svg>`;
 
 mkdirSync('public/icons', { recursive: true });

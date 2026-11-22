@@ -6,8 +6,8 @@ type Variant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
 type Size = 'sm' | 'md' | 'lg';
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-brand-700 text-white hover:bg-brand-800 shadow-sm',
-  secondary: 'bg-white text-slate-800 border border-slate-300 hover:bg-slate-50',
+  primary: 'bg-brand-700 text-white hover:bg-brand-800 shadow-[0_6px_16px_rgb(36_83_255/0.25)]',
+  secondary: 'bg-white text-slate-800 border border-slate-200 hover:border-brand-300 hover:bg-brand-50/40',
   danger: 'bg-red-600 text-white hover:bg-red-700 shadow-sm',
   success: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
   ghost: 'text-slate-700 hover:bg-slate-100',
@@ -19,7 +19,7 @@ const sizes: Record<Size, string> = {
 };
 
 export const buttonClass = (variant: Variant = 'primary', size: Size = 'md', extra = '') =>
-  `inline-flex items-center justify-center rounded-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${extra}`;
+  `inline-flex items-center justify-center rounded-2xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${extra}`;
 
 interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
