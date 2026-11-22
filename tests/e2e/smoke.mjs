@@ -316,9 +316,12 @@ try {
   });
   if (!seed.ok) throw new Error('could not seed ticket: ' + (await seed.text()));
   await admin.goto(`${BASE}/tickets`);
-  await admin.getByText('PNR').first().waitFor();
+  const card = admin.getByRole('button', { name: /10009 SAMPLE SF EXP/ });
+  await card.waitFor();
+  if ((await card.getAttribute('aria-expanded')) !== 'false') throw new Error('tickets should start collapsed');
+  await card.click();
   await admin.getByRole('list', { name: 'Passengers' }).getByText('Guest One').waitFor();
-  ok('Older ticket (no passenger details yet) still shows its passengers');
+  ok('Tickets start collapsed; tapping opens the passenger list (older ticket still shows its passengers)');
 
   await admin.getByRole('button', { name: 'Edit' }).first().click();
   await admin.getByRole('group', { name: /Who is on this ticket/ }).getByRole('checkbox', { name: /Ravi Kumar/ }).check();
@@ -338,6 +341,47 @@ try {
   await admin.getByText('YOU', { exact: true }).waitFor();
   await shot(admin, 'ticket-passengers');
   ok('Passenger details per ticket: coach · berth, status, "YOU" marker, ticket status summary');
+
+  // 15. In-app viewer (no new browser page): open an offline copy of a PDF ticket
+  const maker = await browser.newPage();
+  await maker.setContent('<h1 style="font-family:sans-serif">TEST TICKET</h1><p>PNR 1000000009 · made-up</p>');
+  const pdfB64 = (await maker.pdf({ width: '600px', height: '400px' })).toString('base64');
+  await maker.close();
+  await admin.evaluate(async (b64) => {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: 'application/pdf' });
+    await new Promise((res, rej) => {
+      const req = indexedDB.open('trip-offline-files');
+      req.onupgradeneeded = () => req.result.createObjectStore('files');
+      req.onsuccess = () => {
+        const tx = req.result.transaction('files', 'readwrite');
+        tx.objectStore('files').put({ id: 'legacy1', path: 'x', name: 'test-ticket.pdf', type: 'application/pdf', savedAt: Date.now(), blob }, 'legacy1');
+        tx.oncomplete = res;
+        tx.onerror = () => rej(tx.error);
+      };
+      req.onerror = () => rej(req.error);
+    });
+  }, pdfB64);
+  await admin.reload();
+  await admin.getByRole('button', { name: /10009 SAMPLE SF EXP/ }).click();
+  await admin.getByRole('button', { name: 'Remove offline copy' }).waitFor();
+  await admin.context().setOffline(true);
+  await admin.getByRole('button', { name: 'Open offline copy' }).waitFor();
+  await admin.context().setOffline(false);
+  // open the saved copy (Profile → offline tickets) in the in-app viewer
+  const pagesBefore = admin.context().pages().length;
+  await admin.goto(`${BASE}/profile`);
+  await admin.getByRole('button', { name: 'test-ticket.pdf' }).click();
+  const viewer = admin.getByRole('dialog', { name: 'Viewing test-ticket.pdf' });
+  await viewer.getByRole('img', { name: 'Page 1 of 1' }).waitFor();
+  if (admin.context().pages().length !== pagesBefore) throw new Error('viewer opened a new page');
+  await shot(admin, 'doc-viewer');
+  await viewer.getByRole('button', { name: 'Zoom in' }).click();
+  await viewer.getByText('125%').waitFor();
+  await admin.goBack();
+  await viewer.waitFor({ state: 'detached' });
+  if (!admin.url().endsWith('/profile')) throw new Error('Back should close the viewer, not leave the page');
+  ok('Documents open inside the app (PDF drawn in-app, zoom, Back closes the viewer); offline copy button shows offline');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

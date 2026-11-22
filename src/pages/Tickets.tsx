@@ -1,7 +1,7 @@
 import { personIdOf } from '../domain/people';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, Copy, Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive, X } from 'lucide-react';
+import { ChevronDown, ChevronsUpDown, Copy, Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive, X } from 'lucide-react';
 import { useTickets } from '../hooks/data';
 import { useApprovedMembers, useIsAdmin, useSession } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -46,6 +46,15 @@ export default function Tickets() {
   const [offlineIds, setOfflineIds] = useState<Set<string>>(new Set());
   const [savingId, setSavingId] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  // Tickets start collapsed (summary only); tap to see passengers and buttons.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(params.get('open') ? [params.get('open')!] : []));
+  const toggle = (id: string) =>
+    setExpanded((cur) => {
+      const n = new Set(cur);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   const highlight = params.get('open');
   const today = todayIST();
 
@@ -75,6 +84,7 @@ export default function Tickets() {
     const t = data.find((x) => x.id === highlight);
     if (!t) return;
     if (isTicketCompleted(t, today)) setShowCompleted(true);
+    setExpanded((cur) => new Set(cur).add(t.id));
     const timer = setTimeout(() => document.getElementById(`ticket-${highlight}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50);
     return () => clearTimeout(timer);
   }, [highlight, data, today]);
@@ -143,10 +153,19 @@ export default function Tickets() {
     const savedOffline = offlineIds.has(t.id);
     const pax = passengersOf(t, ctx.nameOf);
     const summary = ticketStatusSummary(pax);
-    const mine = Boolean(ctx.myPersonId) && pax.some((p) => p.personId === ctx.myPersonId);
+    const myPax = ctx.myPersonId ? pax.find((p) => p.personId === ctx.myPersonId) : undefined;
+    const mine = Boolean(myPax);
+    const open = expanded.has(t.id);
     return (
       <Card as="li" key={t.id} className={`overflow-hidden ${highlight === t.id ? 'ring-2 ring-brand-500' : mine ? 'ring-2 ring-brand-300' : ''}`}>
-        <div id={`ticket-${t.id}`} className="px-4 pt-4 sm:px-5">
+        <button
+          type="button"
+          id={`ticket-${t.id}`}
+          onClick={() => toggle(t.id)}
+          aria-expanded={open}
+          aria-controls={`ticket-body-${t.id}`}
+          className="block w-full px-4 pt-4 text-left sm:px-5"
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 font-bold text-ink">
@@ -155,18 +174,21 @@ export default function Tickets() {
               </p>
               <p className="truncate text-sm text-slate-500">{t.title}</p>
             </div>
-            <div className="flex shrink-0 flex-wrap justify-end gap-1">
-              {summary && <StatusChip status={summary} />}
-              {mine && <Badge tone="brand">Your ticket</Badge>}
-              {t.locked && <Badge tone="amber"><Lock className="size-3" /> Locked</Badge>}
-              {completed && <Badge>Completed</Badge>}
-              {savedOffline && <Badge tone="green"><HardDrive className="size-3" /> Offline</Badge>}
+            <div className="flex shrink-0 items-start gap-2">
+              <div className="flex flex-wrap justify-end gap-1">
+                {summary && <StatusChip status={summary} />}
+                {mine && <Badge tone="brand">Your ticket</Badge>}
+                {t.locked && <Badge tone="amber"><Lock className="size-3" /> Locked</Badge>}
+                {completed && <Badge>Completed</Badge>}
+                {savedOffline && <Badge tone="green"><HardDrive className="size-3" /> Offline</Badge>}
+              </div>
+              <ChevronDown className={`mt-0.5 size-5 shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
             </div>
           </div>
           <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
             <div className="min-w-0">
-              <p className="text-3xl font-extrabold tracking-tight text-ink">{t.boardingStation || '—'}</p>
-              <p className="text-sm text-slate-500">{formatTime(t.departureTime) || ' '}</p>
+              <p className={`${open ? 'text-3xl' : 'text-2xl'} font-extrabold tracking-tight text-ink`}>{t.boardingStation || '—'}</p>
+              {open && <p className="text-sm text-slate-500">{formatTime(t.departureTime) || ' '}</p>}
             </div>
             <div className="text-center text-xs font-semibold text-slate-500">
               <p>{formatDateLong(t.journeyDate) || 'Date not set'}</p>
@@ -174,12 +196,23 @@ export default function Tickets() {
               <p>{t.travelClass || ' '}</p>
             </div>
             <div className="min-w-0 text-right">
-              <p className="text-3xl font-extrabold tracking-tight text-ink">{t.destinationStation || '—'}</p>
-              <p className="text-sm text-slate-500">{formatTime(t.arrivalTime) || ' '}</p>
+              <p className={`${open ? 'text-3xl' : 'text-2xl'} font-extrabold tracking-tight text-ink`}>{t.destinationStation || '—'}</p>
+              {open && <p className="text-sm text-slate-500">{formatTime(t.arrivalTime) || ' '}</p>}
             </div>
           </div>
-        </div>
+          {!open && (
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-dashed border-slate-200 py-3 text-sm">
+              <span className="font-mono font-bold tracking-wider text-brand-800">{t.pnr ? `PNR ${t.pnr}` : 'No PNR'}</span>
+              <span className="text-slate-500">
+                {pax.length} {pax.length === 1 ? 'passenger' : 'passengers'}
+                {myPax && berthLabel(myPax) && <> · you <b className="text-ink">{berthLabel(myPax)}</b></>}
+              </span>
+            </div>
+          )}
+        </button>
 
+        {open && (
+        <div id={`ticket-body-${t.id}`}>
         {/* tear line */}
         <div className="relative my-3 h-4" aria-hidden>
           <div className="absolute inset-x-5 top-1/2 border-t-2 border-dashed border-slate-200" />
@@ -228,7 +261,7 @@ export default function Tickets() {
 
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
             {online ? (
-              <FileActions path={t.filePath} fileName={t.fileName} compact offline={{ saved: savedOffline, busy: savingId === t.id, onSave: () => saveOfflineCopy(t), onRemove: () => removeOfflineCopy(t) }} />
+              <FileActions path={t.filePath} fileName={t.fileName} fileType={t.fileType} compact offline={{ saved: savedOffline, busy: savingId === t.id, onSave: () => saveOfflineCopy(t), onRemove: () => removeOfflineCopy(t) }} />
             ) : savedOffline ? (
               <Button size="sm" variant="secondary" onClick={() => openOffline(t)}>Open offline copy</Button>
             ) : (
@@ -247,6 +280,8 @@ export default function Tickets() {
           </div>
           <p className="text-xs text-slate-400">Uploaded by {t.uploadedByName} · {formatDateTime(t.createdAt) || 'syncing…'}</p>
         </div>
+        </div>
+        )}
       </Card>
     );
   };
@@ -255,7 +290,7 @@ export default function Tickets() {
     <div>
       <PageHeader
         title={admin ? 'Ticket Management' : 'Train Tickets'}
-        subtitle="All tickets for the trip. Everyone can view and download; upload tickets for anyone."
+        subtitle="Everyone on the trip can view and download every ticket."
         syncKey="tickets"
         actions={<Button icon={<Plus className="size-5" />} onClick={() => setEditing('new')} disabled={!online || !filesConfigured}>Upload ticket</Button>}
       />
@@ -264,7 +299,7 @@ export default function Tickets() {
 
       <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Whose tickets">
-          {([['all', 'All tickets'], ['mine', 'My tickets'], ['uploaded', 'Uploaded by me']] as const).map(([k, label]) => (
+          {([['all', 'All'], ['mine', 'My tickets'], ['uploaded', 'I uploaded']] as const).map(([k, label]) => (
             <button key={k} role="tab" aria-selected={filters.tab === k} onClick={() => setF({ tab: k })} className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold sm:flex-none ${filters.tab === k ? 'bg-white text-brand-800 shadow-sm' : 'text-slate-600'}`}>
               {label}
             </button>
@@ -275,7 +310,7 @@ export default function Tickets() {
           <input type="search" value={filters.q} onChange={(e) => setF({ q: e.target.value })} placeholder="Search PNR, train, passenger, date…" className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3" aria-label="Search tickets" />
         </label>
       </div>
-      <div className="mb-5 grid grid-cols-2 items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+      <div className="mb-4 grid grid-cols-2 items-end gap-3">
         <SelectField label="Journey date" value={filters.date} onChange={(e) => setF({ date: e.target.value })}>
           <option value="">All dates</option>
           {dates.map((o) => <option key={o.value} value={o.value}>{o.label} ({o.count})</option>)}
@@ -284,9 +319,6 @@ export default function Tickets() {
           <option value="">All trains</option>
           {trains.map((o) => <option key={o.value} value={o.value}>{o.label} ({o.count})</option>)}
         </SelectField>
-        <Button variant="secondary" className="col-span-2 sm:col-span-1" icon={<X className="size-4" />} onClick={clearFilters} disabled={!filtering}>
-          Clear filters
-        </Button>
       </div>
 
       {loading ? (
@@ -297,8 +329,25 @@ export default function Tickets() {
         <EmptyState icon={<TicketIcon className="size-7" />} title="No tickets uploaded yet" message="Upload the first train ticket (PDF or photo) for the group." action={<Button onClick={() => setEditing('new')} icon={<Plus className="size-5" />}>Upload ticket</Button>} />
       ) : (
         <div className="space-y-6">
+          {(filtering || active.length > 1 || (showCompleted && completed.length > 0)) && (
+            <div className="-mb-2 flex items-center justify-end gap-1">
+              {filtering && (
+                <Button size="sm" variant="ghost" icon={<X className="size-4" />} onClick={clearFilters}>Clear filters</Button>
+              )}
+              <span className="flex-1" />
+              {(() => {
+                const visible = [...active, ...(showCompleted ? completed : [])].map((t) => t.id);
+                const allOpen = visible.length > 0 && visible.every((id) => expanded.has(id));
+                return (
+                  <Button size="sm" variant="ghost" icon={<ChevronsUpDown className="size-4" />} onClick={() => setExpanded(allOpen ? new Set() : new Set(visible))}>
+                    {allOpen ? 'Collapse all' : 'Expand all'}
+                  </Button>
+                );
+              })()}
+            </div>
+          )}
           {active.length > 0 ? (
-            <ul className="grid gap-4 md:grid-cols-2">{active.map((t) => renderCard(t, false))}</ul>
+            <ul className="grid items-start gap-4 md:grid-cols-2">{active.map((t) => renderCard(t, false))}</ul>
           ) : filtering ? (
             <EmptyState icon={<TicketIcon className="size-7" />} title="No matching upcoming tickets" message={completed.length ? 'Some completed tickets match – see below.' : 'Try a different filter or search.'} action={<Button variant="secondary" onClick={clearFilters}>Clear filters</Button>} />
           ) : (
@@ -318,7 +367,7 @@ export default function Tickets() {
                 <ChevronDown className={`size-5 transition-transform ${showCompleted ? 'rotate-180' : ''}`} aria-hidden />
               </button>
               {showCompleted && (
-                <ul id="completed-tickets" className="mt-4 grid gap-4 md:grid-cols-2">{completed.map((t) => renderCard(t, true))}</ul>
+                <ul id="completed-tickets" className="mt-4 grid items-start gap-4 md:grid-cols-2">{completed.map((t) => renderCard(t, true))}</ul>
               )}
             </section>
           )}

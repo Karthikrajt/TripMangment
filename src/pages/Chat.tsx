@@ -8,7 +8,8 @@ import { toast } from '../components/ui/Toast';
 import { confirm } from '../components/ui/Confirm';
 import { sendMessage, deleteMessage, loadOlder } from '../services/chat';
 import { markRead } from '../services/users';
-import { uploadFile, getDownloadUrl } from '../lib/files';
+import { uploadFile } from '../lib/files';
+import { viewFile } from '../components/DocViewer';
 import { validateFileMeta } from '../../supabase/functions/_shared/fileRules';
 import { formatClock, formatDateLong, todayIST, tsToDate } from '../lib/format';
 import { errorMessage } from '../lib/retry';
@@ -17,27 +18,10 @@ import { CHAT_PAGE_SIZE } from '../config/constants';
 import type { ChatMessage } from '../domain/types';
 
 function Attachment({ m }: { m: ChatMessage }) {
-  const [busy, setBusy] = useState(false);
-  const open = async () => {
-    setBusy(true);
-    const w = window.open('', '_blank');
-    try {
-      const url = await getDownloadUrl(m.filePath, { inline: true, fileName: m.fileName });
-      if (w) {
-        w.opener = null;
-        w.location.href = url;
-      }
-    } catch (e) {
-      w?.close();
-      toast.error(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  };
   return (
-    <button onClick={open} disabled={busy} className="mt-1 flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-left text-sm hover:bg-black/10">
+    <button onClick={() => viewFile(m.filePath, m.fileName || 'Attachment', m.fileType)} className="mt-1 flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-left text-sm hover:bg-black/10">
       {m.kind === 'image' ? <ImageIcon className="size-4" /> : <FileText className="size-4" />}
-      <span className="truncate">{busy ? 'Opening…' : m.fileName || 'Attachment'}</span>
+      <span className="truncate">{m.fileName || 'Attachment'}</span>
     </button>
   );
 }

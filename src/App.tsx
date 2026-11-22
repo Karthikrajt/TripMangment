@@ -6,6 +6,7 @@ import { FullPageSpinner, Spinner, ErrorState } from './components/ui/Feedback';
 import { Toaster } from './components/ui/Toast';
 import { ConfirmHost } from './components/ui/Confirm';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { DocViewerHost } from './components/DocViewer';
 import { env, missingConfig } from './config/env';
 import Login from './pages/Login';
 import Pending from './pages/Pending';
@@ -98,6 +99,7 @@ export default function App() {
       <Toaster />
       <ConfirmHost />
       <UpdatePrompt />
+      <DocViewerHost />
     </BrowserRouter>
   );
 }
