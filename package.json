@@ -17,6 +17,7 @@
     "check:functions": "cd supabase/functions && npx -y deno@2 check files/index.ts notify/index.ts"
   },
   "dependencies": {
+    "@dnd-kit/core": "6.3.1",
     "@supabase/supabase-js": "2.119.2",
     "firebase": "11.10.0",
     "idb-keyval": "6.3.0",

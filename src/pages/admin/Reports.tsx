@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { BarChart3, Download, Printer, Gauge, RefreshCw } from 'lucide-react';
 import { collection, getCountFromServer } from 'firebase/firestore';
 import { useExpenses, useSettlements } from '../../hooks/data';
-import { useSession, memberName } from '../../store/session';
+import { useSession, memberName, useShareDefaults } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
 import { Card, CardBody, CardHeader, Stat } from '../../components/ui/Card';
@@ -24,7 +24,7 @@ export default function Reports() {
   const settlements = useSettlements();
   const { members, trip } = useSession();
   const approvedUids = useMemo(() => peopleOf(members).map((m) => m.uid), [members]);
-  const heads = headCount(peopleOf(members));
+  const heads = headCount(peopleOf(members), useShareDefaults());
   const approved = expenses.data.filter((e) => e.status === 'approved');
   const total = sumPaise(approved.map((e) => e.amountPaise));
   const summary = useMemo(() => computeSettlement(expenses.data, settlements.data, approvedUids), [expenses.data, settlements.data, approvedUids]);

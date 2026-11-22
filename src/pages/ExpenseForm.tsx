@@ -1,9 +1,9 @@
 import { personIdOf } from '../domain/people';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { WifiOff } from 'lucide-react';
 import { useExpenses } from '../hooks/data';
-import { useApprovedMembers, useSession } from '../store/session';
+import { useApprovedMembers, useSession, useShareDefaults } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
 import { Button } from '../components/ui/Button';
 import { Card, CardBody } from '../components/ui/Card';
@@ -44,7 +44,8 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
   const me = useSession((s) => s.member)!;
   const members = useApprovedMembers();
   const allUids = useMemo(() => members.map((m) => m.uid), [members]);
-  const weights = useMemo(() => weightsOf(members), [members]);
+  const shareDefaults = useShareDefaults();
+  const weights = useMemo(() => weightsOf(members, shareDefaults), [members, shareDefaults.child, shareDefaults.infant]);
   // Generated once per form so double-taps and offline retries map to the same document.
   const idempotencyKey = useRef(existing?.id ?? newId());
 
@@ -57,7 +58,18 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
     description: existing?.description ?? '',
     splitMethod: (existing?.splitMethod ?? 'equal_all') as SplitMethod,
   });
-  const [selected, setSelected] = useState<string[]>(existing ? Object.keys(existing.splits) : allUids);
+  const [selected, setSelectedState] = useState<string[]>(existing ? Object.keys(existing.splits) : allUids);
+  // New expenses start with everyone selected. People may load after the form
+  // opens (direct link / refresh), so fill them in until the user changes it.
+  const touchedSelection = useRef(Boolean(existing));
+  const setSelected = (uids: string[]) => {
+    touchedSelection.current = true;
+    setSelectedState(uids);
+  };
+  const allKey = allUids.join(',');
+  useEffect(() => {
+    if (!touchedSelection.current) setSelectedState(allKey ? allKey.split(',') : []);
+  }, [allKey]);
   const [custom, setCustom] = useState<Record<string, string>>(
     existing?.splitMethod === 'custom' ? Object.fromEntries(Object.entries(existing.splits).map(([k, v]) => [k, paiseToInput(v)])) : {},
   );
@@ -175,12 +187,12 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
               <div className="sm:col-span-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-700">
                 <p className="mb-2 font-medium">
                   Per head: about {formatINR(Math.round((amount! * 100) / Object.keys(preview.splits).reduce((a, id) => a + (weights[id] ?? 100), 0)))} per adult
-                  {(f.values.splitMethod === 'equal_all' ? members : members.filter((m) => selected.includes(m.uid))).some((m) => weightOf(m) === 0) && ' · infants not counted'}
+                  {(f.values.splitMethod === 'equal_all' ? members : members.filter((m) => selected.includes(m.uid))).some((m) => weightOf(m, shareDefaults) === 0) && ' · some people not counted (0%)'}
                 </p>
                 <ul className="max-h-48 space-y-0.5 overflow-y-auto">
                   {members.filter((m) => m.uid in preview.splits).map((m) => (
                     <li key={m.uid} className="flex justify-between gap-2">
-                      <span>{m.displayName} <span className="text-slate-500">· {ageLabel(m)}</span></span>
+                      <span>{m.displayName} <span className="text-slate-500">· {ageLabel(m, shareDefaults)}</span></span>
                       <span className="tabular-nums font-semibold">{formatINR(preview.splits[m.uid])}</span>
                     </li>
                   ))}

@@ -2,6 +2,7 @@
  * Global session state: Firebase user, my membership, the trip, and the
  * approved member list (shared by every page to avoid duplicate listeners).
  */
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { onAuthStateChanged, signInWithPopup, signInWithRedirect, signOut, type User } from 'firebase/auth';
 import { collection, doc, limit, onSnapshot, orderBy, query, where, type Unsubscribe } from 'firebase/firestore';
@@ -10,7 +11,7 @@ import { upsertUserProfile } from '../services/users';
 import { getPublicSummary, type PublicSummary } from '../services/trip';
 import type { AppNotification, ChatMessage, Member, Trip, UserProfile } from '../domain/types';
 import { isAdmin as isAdminFn } from '../domain/permissions';
-import { peopleOf, personIdOf } from '../domain/people';
+import { peopleOf, personIdOf, sharesFromTrip } from '../domain/people';
 import { CHAT_PAGE_SIZE, NOTIFICATION_PAGE_SIZE } from '../config/constants';
 import { errorMessage } from '../lib/retry';
 import { useSync } from '../lib/sync';
@@ -151,10 +152,19 @@ onAuthStateChanged(auth, (user) => {
 export const useMe = () => useSession((s) => s.member);
 export const useIsAdmin = () => useSession((s) => isAdminFn(s.member));
 /** Travellers to plan and split for (see domain/people.ts). */
-export const useApprovedMembers = () => peopleOf(useSession((s) => s.members));
+export const useApprovedMembers = () => {
+  const members = useSession((s) => s.members);
+  return useMemo(() => peopleOf(members), [members]);
+};
 export const usePeople = useApprovedMembers;
 /** The person id the signed-in user acts as (their linked traveller, or themselves). */
 export const useMyPersonId = () => useSession((s) => personIdOf(s.member));
+/** Default child / infant share % from Trip Settings. */
+export const useShareDefaults = () => {
+  const child = useSession((s) => s.trip?.childSharePercent);
+  const infant = useSession((s) => s.trip?.infantSharePercent);
+  return sharesFromTrip({ childSharePercent: child, infantSharePercent: infant });
+};
 
 export function memberName(members: Member[], uid: string): string {
   return members.find((m) => m.uid === uid)?.displayName ?? 'Former member';

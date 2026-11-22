@@ -1,7 +1,7 @@
 import { personIdOf, peopleOf, headCount, ageSummary } from '../domain/people';
 import { CalendarDays, Hotel, Bus, Receipt, MessagesSquare, Ticket, Megaphone, Activity, Users, Train, UserCheck, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useSession, useIsAdmin } from '../store/session';
+import { useSession, useIsAdmin, useShareDefaults } from '../store/session';
 import { useAccommodations, useAnnouncements, useExpenses, useItinerary, useTickets, useTransport } from '../hooks/data';
 import { Card, CardBody, CardHeader, QuickCard, Stat } from '../components/ui/Card';
 import { EmptyState, Notice } from '../components/ui/Feedback';
@@ -23,7 +23,7 @@ export default function Dashboard() {
   const announcements = useAnnouncements(3);
 
   const approved = peopleOf(members);
-  const heads = headCount(approved);
+  const heads = headCount(approved, useShareDefaults());
   const pending = members.filter((m) => m.status === 'pending');
   const approvedExpenses = expenses.data.filter((e) => e.status === 'approved');
   const total = sumPaise(approvedExpenses.map((e) => e.amountPaise));

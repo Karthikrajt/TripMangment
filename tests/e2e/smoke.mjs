@@ -182,6 +182,89 @@ try {
   await bob.getByText('₹285.71').first().waitFor();
   await shot(bob, 'bob-linked-settlement');
   ok('Sign-in linked to an existing traveller sees that traveller’s share as their own');
+
+  // 11. Trip-level share defaults + family groups (made-up names)
+  await admin.goto(`${BASE}/admin/settings`);
+  await admin.getByLabel('Child (default %)').fill('40');
+  await admin.getByLabel('Infant (default %)').fill('10');
+  await admin.getByRole('button', { name: 'Save changes' }).click();
+  await admin.getByText('Trip settings saved').waitFor();
+  await admin.goto(`${BASE}/members`);
+  await admin.getByText('Child · 40%').first().waitFor();
+  await admin.getByText('Infant · 10%').first().waitFor();
+  ok('Trip Settings defaults (child 40%, infant 10%) apply to people without their own %');
+
+  await admin.getByRole('button', { name: 'Add traveller' }).first().click();
+  await admin.getByLabel('Full name').fill('Asha Test');
+  await admin.getByLabel('Family', { exact: true }).selectOption('__new');
+  await admin.getByLabel('New family name').fill('Test Family');
+  await admin.getByLabel('Age group').selectOption('child');
+  await admin.getByLabel(/Use the trip default/).uncheck();
+  await admin.getByLabel(/Share for Asha Test/).fill('75');
+  await admin.getByRole('button', { name: 'Add', exact: true }).click();
+  await admin.getByRole('heading', { name: 'Test Family', exact: true }).waitFor();
+  await admin.getByRole('button', { name: 'Add to family' }).first().waitFor();
+  // add a second member straight into the family from its header
+  await admin.getByRole('heading', { name: 'Test Family', exact: true }).locator('xpath=..').getByRole('button', { name: 'Add to family' }).click();
+  await admin.getByRole('dialog', { name: 'Add to Test Family' }).waitFor();
+  await admin.getByLabel('Full name').fill('Baby Test');
+  await admin.getByLabel('Age group').selectOption('infant');
+  await admin.getByRole('button', { name: 'Add', exact: true }).click();
+  await admin.getByText('Baby Test').waitFor();
+  await admin.getByText('Child · 75% (own %)').waitFor();
+  const famSection = await admin.getByRole('heading', { name: 'Test Family', exact: true }).locator('xpath=../..').innerText();
+  if (!famSection.includes('Baby Test') || !famSection.includes('Asha Test')) throw new Error('family section missing members: ' + famSection);
+  await shot(admin, 'members-families');
+  ok('Family created; second member added from the family header; child has own 75%');
+
+  await admin.goto(`${BASE}/expenses/new`);
+  await admin.getByLabel('Expense title').fill('Family snacks');
+  await admin.getByLabel('Amount (₹)').fill('850');
+  await admin.getByLabel('How should this be split?').selectOption('equal_selected');
+  await admin.getByRole('group', { name: /Members included/ }).getByRole('button', { name: 'Clear all' }).click();
+  await admin.getByRole('button', { name: /^Test Family/ }).click();
+  await shot(admin, 'expense-family-chip');
+  const fam = await admin.locator('div.rounded-xl', { hasText: 'Per head' }).last().innerText();
+  if (!fam.includes('₹750') || !fam.includes('₹100')) throw new Error('unexpected family split: ' + fam);
+  await shot(admin, 'expense-family-chip');
+  ok('Whole-family select in the expense form: 75% + 10% split ₹850 as ₹750 / ₹100');
+
+  // 12. Family board: drag and drop between families (made-up names)
+  await admin.goto(`${BASE}/members`);
+  await admin.getByRole('tab', { name: 'Family board' }).click();
+  const col = (name) => admin.getByRole('listitem', { name, exact: true });
+  await col('Test Family').waitFor();
+  async function drag(person, target) {
+    const from = await admin.getByRole('button', { name: new RegExp(`^${person}\\.`) }).boundingBox();
+    const to = await col(target).boundingBox();
+    await admin.mouse.move(from.x + 40, from.y + from.height / 2);
+    await admin.mouse.down();
+    await admin.mouse.move(from.x + 60, from.y + from.height / 2 + 10, { steps: 5 });
+    await admin.mouse.move(to.x + to.width / 2, to.y + 60, { steps: 15 });
+    await admin.mouse.up();
+  }
+  await drag('Kavin \\(kid\\)', 'Test Family');
+  await col('Test Family').getByText('Kavin (kid)').waitFor();
+  await shot(admin, 'family-board');
+  ok('Dragged a person into another family on the board');
+
+  await drag('Baby Nila', 'New family');
+  await admin.getByLabel('Family name').fill('Sample Family');
+  await admin.getByRole('button', { name: 'Create & move' }).click();
+  await col('Sample Family').getByText('Baby Nila').waitFor();
+  ok('Dropping on "New family" asks for a name and creates the family');
+
+  await admin.getByLabel('Move Kavin (kid) to family').selectOption('');
+  await col('No family').getByText('Kavin (kid)').waitFor();
+  ok('"Move to" menu works without dragging');
+
+  // keyboard: focus card, space to pick up, arrow right to next column, space to drop
+  await admin.getByRole('button', { name: /^Bob Uncle\./ }).focus();
+  await admin.keyboard.press('Space');
+  await admin.keyboard.press('ArrowRight');
+  await admin.keyboard.press('Space');
+  await admin.waitForTimeout(500);
+  ok('Keyboard drag does not crash (space / arrows / space)');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

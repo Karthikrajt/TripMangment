@@ -19,7 +19,8 @@ export async function getPublicSummary(): Promise<PublicSummary | null> {
   return s.exists() ? (s.data() as PublicSummary) : null;
 }
 
-export type TripInput = Pick<Trip, 'name' | 'destination' | 'description' | 'startDate' | 'endDate' | 'emergencyInfo' | 'importantContacts' | 'ticketsLocked'>;
+export type TripInput = Pick<Trip, 'name' | 'destination' | 'description' | 'startDate' | 'endDate' | 'emergencyInfo' | 'importantContacts' | 'ticketsLocked'> &
+  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent'>>;
 
 /** First-run setup by the bootstrap admin: trip + public summary + admin membership, atomically. */
 export async function createTrip(user: User, input: TripInput): Promise<void> {

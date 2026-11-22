@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Lock } from 'lucide-react';
+import { Plus, Trash2, Lock, Users } from 'lucide-react';
+import { sharesFromTrip } from '../../domain/people';
 import { useSession } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Button } from '../../components/ui/Button';
@@ -14,6 +15,7 @@ import { isISODate, isPhone } from '../../domain/validation';
 export default function TripSettings() {
   const trip = useSession((s) => s.trip);
   const [v, setV] = useState(() => (trip ? { ...trip } : null));
+  const [shares, setShares] = useState(() => { const d = sharesFromTrip(trip); return { child: String(d.child), infant: String(d.infant) }; });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -30,10 +32,15 @@ export default function TripSettings() {
     if (!isISODate(v.startDate) || !isISODate(v.endDate) || v.endDate < v.startDate) return setError('Please enter valid start and end dates.');
     const contacts = v.importantContacts.filter((c) => c.name.trim() || c.phone.trim());
     if (contacts.some((c) => !c.name.trim() || !isPhone(c.phone))) return setError('Each contact needs a name and a valid phone number.');
+    const child = Number(shares.child);
+    const infant = Number(shares.infant);
+    if (![child, infant].every((x) => Number.isInteger(x) && x >= 0 && x <= 100)) return setError('Child and infant shares must be whole numbers from 0 to 100.');
     setBusy(true);
     setError(null);
     try {
       await updateTrip(trip, {
+        childSharePercent: child,
+        infantSharePercent: infant,
         name: v.name.trim(),
         destination: v.destination.trim(),
         description: v.description.trim(),
@@ -82,6 +89,15 @@ export default function TripSettings() {
               <Button variant="secondary" size="sm" icon={<Plus className="size-4" />} onClick={() => setV({ ...v, importantContacts: [...v.importantContacts, { name: '', phone: '', note: '' }] })}>Add contact</Button>
             )}
           </div>
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader icon={<Users className="size-5" />} title="Expense split per head" subtitle="Share of one adult. You can still give any child or infant their own % under Member Management." />
+        <CardBody className="grid gap-4 sm:grid-cols-3">
+          <TextField label="Adult" value="100%" disabled hint="Always a full share" />
+          <TextField label="Child (default %)" type="number" min={0} max={100} inputMode="numeric" value={shares.child} onChange={(e) => setShares({ ...shares, child: e.target.value })} hint="e.g. 50 = half of an adult" />
+          <TextField label="Infant (default %)" type="number" min={0} max={100} inputMode="numeric" value={shares.infant} onChange={(e) => setShares({ ...shares, infant: e.target.value })} hint="0 = not counted" />
+          <p className="text-sm text-slate-600 sm:col-span-3">Changes apply to new expenses. Expenses already saved keep the split they were saved with.</p>
         </CardBody>
       </Card>
       <Card>
