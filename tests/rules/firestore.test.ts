@@ -177,6 +177,12 @@ describe('train tickets', () => {
   it('any approved member can upload a ticket for any passengers', async () => {
     await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/tickets/t1`), ticket('alice')));
   });
+  it('tickets can carry a per-passenger list (max 50)', async () => {
+    const pax = { personId: 'alice', name: 'A', age: 30, gender: 'F', coach: 'M2', berth: '58', berthType: 'MB', status: 'CNF' };
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/tickets/tp`), ticket('alice', { passengers: [pax] })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/tickets/tp2`), ticket('alice', { passengers: Array(51).fill(pax) })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/tickets/tp3`), ticket('alice', { passengers: 'not a list' })));
+  });
   it('admin can upload tickets', async () => {
     await assertSucceeds(setDoc(doc(db('owner'), `trips/${T}/tickets/t2`), ticket('owner')));
   });

@@ -2,6 +2,7 @@ import { personIdOf } from '../domain/people';
 import { Link } from 'react-router-dom';
 import { Bus, CalendarDays, Hotel, Megaphone, MessagesSquare, Phone, Receipt, ShieldAlert, Ticket, Train, BedDouble } from 'lucide-react';
 import { useSession } from '../store/session';
+import { berthLabel, passengersOf } from '../domain/ticketPassengers';
 import { useAccommodations, useAnnouncements, useItinerary, useRooms, useTickets, useTransport } from '../hooks/data';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { ButtonLink } from '../components/ui/Button';
@@ -66,7 +67,12 @@ export default function Live() {
                 <p className="text-lg font-semibold">{nextTicket.trainName} #{nextTicket.trainNumber}</p>
                 <p className="text-xl font-bold">{nextTicket.boardingStation} → {nextTicket.destinationStation}</p>
                 <p>{formatDate(nextTicket.journeyDate)} · Departs {formatTime(nextTicket.departureTime)}</p>
-                <p className="font-mono text-lg">PNR {nextTicket.pnr} · {nextTicket.coach} {nextTicket.seats}</p>
+                <p className="font-mono text-lg">PNR {nextTicket.pnr}</p>
+                {(() => {
+                  const mine = passengersOf(nextTicket, (id) => members.find((m) => m.uid === id)?.displayName ?? '').find((p) => p.personId === personIdOf(member));
+                  const seat = mine ? berthLabel(mine) : [nextTicket.coach, nextTicket.seats].filter(Boolean).join(' ');
+                  return seat ? <p className="text-lg">{mine ? 'Your berth' : 'Seats'}: <b className="font-mono">{seat}</b>{mine?.status && <span className="ml-2 text-sm font-semibold text-emerald-700">{mine.status}</span>}</p> : null;
+                })()}
               </>
             ) : <p className="text-slate-500">No upcoming train.</p>}
             <ButtonLink to="/tickets" size="lg" className="w-full" icon={<Ticket className="size-5" />}>Open tickets</ButtonLink>

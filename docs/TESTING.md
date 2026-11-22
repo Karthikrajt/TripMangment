@@ -30,6 +30,7 @@
 - [ ] A `.exe`, a 6 MB PDF and a PNG renamed to `.pdf` are all rejected
 - [ ] Calling `functions/v1/files` with no token, an expired token or a pending user's token returns 401/403
 - [ ] An old signed URL stops working after 5 minutes
+- [ ] Passenger list per ticket: tick travellers, enter age / coach / berth / status for each; the card shows one line per passenger, a “YOU” marker, and a status summary (CNF, RLWL 4–7, CNF + WL). Older tickets still show their passengers
 - [ ] Date and train filters (with counts) combine with search and the All / My / Uploaded tabs. Clear filters resets everything
 - [ ] A ticket moves to the collapsed "Completed (n)" section from journey date + 2 days (IST). `/tickets?open=<id>` expands it and scrolls to the ticket
 - [ ] "Save for offline", then airplane mode, then "Open offline copy" works. Profile lists the copy and can remove it

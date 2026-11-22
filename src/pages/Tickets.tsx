@@ -1,7 +1,7 @@
 import { personIdOf } from '../domain/people';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive, X } from 'lucide-react';
+import { ChevronDown, Copy, Lock, LockOpen, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, Train, HardDrive, X } from 'lucide-react';
 import { useTickets } from '../hooks/data';
 import { useApprovedMembers, useIsAdmin, useSession } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -10,7 +10,7 @@ import { Card } from '../components/ui/Card';
 import { Badge, EmptyState, ErrorState, Notice, Spinner } from '../components/ui/Feedback';
 import { Modal } from '../components/ui/Modal';
 import { FormError, SelectField, TextArea, TextField } from '../components/ui/Field';
-import { MemberChips, MemberPicker } from '../components/MemberPicker';
+import { MemberPicker } from '../components/MemberPicker';
 import { FileActions, FileInput } from '../components/Files';
 import { confirm } from '../components/ui/Confirm';
 import { toast } from '../components/ui/Toast';
@@ -19,7 +19,7 @@ import { canEditTicket } from '../domain/permissions';
 import { createTicket, deleteTicket, setTicketLock, updateTicket, type TicketInput } from '../services/tickets';
 import { uploadFile, filesConfigured } from '../lib/files';
 import { listOffline, openBlob, removeOffline, saveOffline, getOffline } from '../lib/offlineFiles';
-import { formatDate, formatDateTime, formatTime, todayIST } from '../lib/format';
+import { formatDateLong, formatDateTime, formatTime, todayIST } from '../lib/format';
 import {
   applyFilters, dateOptions, EMPTY_FILTERS, hasActiveFilters, isTicketCompleted, matchesTab, pruneSelection, splitByCompletion, trainOptions,
   type FilterContext, type TicketFilterState,
@@ -27,7 +27,8 @@ import {
 import { errorMessage } from '../lib/retry';
 import { isClockTime, isISODate } from '../domain/validation';
 import { useOnline } from '../hooks/useOnline';
-import type { Ticket } from '../domain/types';
+import { BERTH_TYPES, type BerthType, type Ticket, type TicketPassenger } from '../domain/types';
+import { berthLabel, derivedTicketFields, emptyPassenger, passengersOf, statusKind, ticketStatusSummary, validatePassengers } from '../domain/ticketPassengers';
 
 
 export default function Tickets() {
@@ -128,71 +129,126 @@ export default function Tickets() {
     if (f) openBlob(f);
   };
 
+  const copyPnr = async (pnr: string) => {
+    try {
+      await navigator.clipboard.writeText(pnr);
+      toast.success('PNR copied');
+    } catch {
+      toast.info(`PNR ${pnr}`);
+    }
+  };
+
   const renderCard = (t: Ticket, completed: boolean) => {
-            const editable = canEditTicket(me, t) && (admin || !trip?.ticketsLocked);
-            const savedOffline = offlineIds.has(t.id);
-            return (
-              <Card as="li" key={t.id} className={`overflow-hidden ${highlight === t.id ? 'ring-2 ring-brand-500' : ''}`}>
-                <div id={`ticket-${t.id}`} className="flex items-start justify-between gap-3 bg-brand-50 px-4 py-3">
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-slate-900">{t.title}</h3>
-                    <p className="flex items-center gap-1.5 text-slate-700"><Train className="size-4" /> {t.trainName} {t.trainNumber && <span className="text-slate-500">#{t.trainNumber}</span>}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    {t.pnr && <span className="rounded-lg bg-white px-2 py-1 font-mono text-sm font-bold tracking-wider text-brand-800">PNR {t.pnr}</span>}
-                    {t.locked && <Badge tone="amber"><Lock className="size-3" /> Locked</Badge>}
-                    {completed && <Badge>Completed</Badge>}
-                    {savedOffline && <Badge tone="green"><HardDrive className="size-3" /> Offline</Badge>}
-                  </div>
-                </div>
-                <div className="space-y-3 px-4 py-3">
-                  <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 text-center">
-                    <div>
-                      <p className="text-lg font-bold">{t.boardingStation || '—'}</p>
-                      <p className="text-sm text-slate-600">{formatTime(t.departureTime)}</p>
-                    </div>
-                    <span className="text-slate-400">→</span>
-                    <div>
-                      <p className="text-lg font-bold">{t.destinationStation || '—'}</p>
-                      <p className="text-sm text-slate-600">{formatTime(t.arrivalTime)}</p>
-                    </div>
-                  </div>
-                  <dl className="grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-3 text-sm">
-                    <div><dt className="text-slate-500">Date</dt><dd className="font-semibold">{formatDate(t.journeyDate) || '—'}</dd></div>
-                    <div><dt className="text-slate-500">Coach / Seat</dt><dd className="font-semibold">{[t.coach, t.seats].filter(Boolean).join(' · ') || '—'}</dd></div>
-                    <div><dt className="text-slate-500">Class</dt><dd className="font-semibold">{t.travelClass || '—'}</dd></div>
-                  </dl>
-                  <div>
-                    <p className="mb-1 text-sm font-medium text-slate-600">Passengers ({t.passengerUids.length + t.passengerNames.length})</p>
-                    <MemberChips uids={t.passengerUids} members={members} />
-                    {t.passengerNames.length > 0 && <p className="mt-1 text-sm text-slate-700">Also: {t.passengerNames.join(', ')}</p>}
-                  </div>
-                  {t.notes && <p className="text-sm text-slate-600">📝 {t.notes}</p>}
-                  <p className="text-xs text-slate-500">Uploaded by {t.uploadedByName} · {formatDateTime(t.createdAt) || 'syncing…'}</p>
-                  <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-                    {online ? (
-                      <FileActions path={t.filePath} fileName={t.fileName} compact offline={{ saved: savedOffline, busy: savingId === t.id, onSave: () => saveOfflineCopy(t), onRemove: () => removeOfflineCopy(t) }} />
-                    ) : savedOffline ? (
-                      <Button size="sm" variant="secondary" onClick={() => openOffline(t)}>Open offline copy</Button>
-                    ) : (
-                      <span className="text-sm text-slate-500">Connect to the internet to open this ticket.</span>
-                    )}
-                    <span className="flex-1" />
-                    {editable && (
-                      <>
-                        <Button size="sm" variant="ghost" icon={<Pencil className="size-4" />} onClick={() => setEditing(t)} disabled={!online}>Edit</Button>
-                        <Button size="sm" variant="ghost" className="text-red-700" icon={<Trash2 className="size-4" />} onClick={() => remove(t)} disabled={!online}>Delete</Button>
-                      </>
-                    )}
-                    {admin && (
-                      <Button size="sm" variant="ghost" icon={t.locked ? <LockOpen className="size-4" /> : <Lock className="size-4" />} onClick={() => toggleLock(t)}>
-                        {t.locked ? 'Unlock' : 'Lock'}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            );
+    const editable = canEditTicket(me, t) && (admin || !trip?.ticketsLocked);
+    const savedOffline = offlineIds.has(t.id);
+    const pax = passengersOf(t, ctx.nameOf);
+    const summary = ticketStatusSummary(pax);
+    const mine = Boolean(ctx.myPersonId) && pax.some((p) => p.personId === ctx.myPersonId);
+    return (
+      <Card as="li" key={t.id} className={`overflow-hidden ${highlight === t.id ? 'ring-2 ring-brand-500' : mine ? 'ring-2 ring-brand-300' : ''}`}>
+        <div id={`ticket-${t.id}`} className="px-4 pt-4 sm:px-5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="flex items-center gap-1.5 font-bold text-ink">
+                <Train className="size-4 shrink-0 text-brand-700" aria-hidden />
+                <span className="truncate">{[t.trainNumber, t.trainName].filter(Boolean).join(' ') || 'Train not set'}</span>
+              </p>
+              <p className="truncate text-sm text-slate-500">{t.title}</p>
+            </div>
+            <div className="flex shrink-0 flex-wrap justify-end gap-1">
+              {summary && <StatusChip status={summary} />}
+              {mine && <Badge tone="brand">Your ticket</Badge>}
+              {t.locked && <Badge tone="amber"><Lock className="size-3" /> Locked</Badge>}
+              {completed && <Badge>Completed</Badge>}
+              {savedOffline && <Badge tone="green"><HardDrive className="size-3" /> Offline</Badge>}
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div className="min-w-0">
+              <p className="text-3xl font-extrabold tracking-tight text-ink">{t.boardingStation || '—'}</p>
+              <p className="text-sm text-slate-500">{formatTime(t.departureTime) || ' '}</p>
+            </div>
+            <div className="text-center text-xs font-semibold text-slate-500">
+              <p>{formatDateLong(t.journeyDate) || 'Date not set'}</p>
+              <p className="my-0.5 text-slate-300" aria-hidden>———→</p>
+              <p>{t.travelClass || ' '}</p>
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="text-3xl font-extrabold tracking-tight text-ink">{t.destinationStation || '—'}</p>
+              <p className="text-sm text-slate-500">{formatTime(t.arrivalTime) || ' '}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* tear line */}
+        <div className="relative my-3 h-4" aria-hidden>
+          <div className="absolute inset-x-5 top-1/2 border-t-2 border-dashed border-slate-200" />
+          <div className="absolute -left-2 top-0 size-4 rounded-full bg-ground" />
+          <div className="absolute -right-2 top-0 size-4 rounded-full bg-ground" />
+        </div>
+
+        <div className="space-y-3 px-4 pb-4 sm:px-5">
+          <div className="flex items-center justify-between gap-2">
+            {t.pnr ? (
+              <button type="button" onClick={() => copyPnr(t.pnr)} className="group flex items-baseline gap-2 rounded-xl text-left" aria-label={`PNR ${t.pnr}, tap to copy`}>
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">PNR</span>
+                <span className="font-mono text-lg font-bold tracking-wider text-brand-800">{t.pnr}</span>
+                <Copy className="size-3.5 text-slate-400 group-hover:text-brand-700" aria-hidden />
+              </button>
+            ) : (
+              <span className="text-sm text-slate-500">No PNR</span>
+            )}
+            <span className="text-sm text-slate-500">{pax.length} {pax.length === 1 ? 'passenger' : 'passengers'}</span>
+          </div>
+
+          <ul className="divide-y divide-slate-100 overflow-hidden rounded-2xl bg-slate-50" aria-label="Passengers">
+            {pax.map((p, i) => {
+              const isMe = Boolean(p.personId) && p.personId === ctx.myPersonId;
+              const seat = berthLabel(p);
+              return (
+                <li key={`${p.personId || p.name}-${i}`} className={`flex items-center gap-3 px-3 py-2.5 ${isMe ? 'bg-brand-50' : ''}`}>
+                  <span className="w-5 shrink-0 text-center text-xs font-semibold text-slate-400">{i + 1}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-ink">
+                      {p.name || 'Passenger'}
+                      {isMe && <span className="ml-1.5 rounded-full bg-brand-700 px-1.5 py-0.5 align-middle text-[10px] font-bold text-white">YOU</span>}
+                    </span>
+                    {(p.age > 0 || p.gender) && <span className="text-xs text-slate-500">{[p.gender && GENDER_LABEL[p.gender], p.age > 0 && `${p.age} yrs`].filter(Boolean).join(' · ')}</span>}
+                  </span>
+                  <span className="text-right">
+                    {seat && <span className="block whitespace-nowrap text-sm font-bold tabular-nums text-ink">{seat}</span>}
+                    {p.status && <StatusChip status={p.status} small />}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+
+          {t.notes && <p className="text-sm text-slate-600">📝 {t.notes}</p>}
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+            {online ? (
+              <FileActions path={t.filePath} fileName={t.fileName} compact offline={{ saved: savedOffline, busy: savingId === t.id, onSave: () => saveOfflineCopy(t), onRemove: () => removeOfflineCopy(t) }} />
+            ) : savedOffline ? (
+              <Button size="sm" variant="secondary" onClick={() => openOffline(t)}>Open offline copy</Button>
+            ) : (
+              <span className="text-sm text-slate-500">Connect to the internet to open this ticket.</span>
+            )}
+            <span className="flex-1" />
+            {editable && (
+              <>
+                <Button size="sm" variant="ghost" icon={<Pencil className="size-4" />} onClick={() => setEditing(t)} disabled={!online}>Edit</Button>
+                <Button size="sm" variant="ghost" className="text-red-700" aria-label="Delete ticket" icon={<Trash2 className="size-4" />} onClick={() => remove(t)} disabled={!online} />
+              </>
+            )}
+            {admin && (
+              <Button size="sm" variant="ghost" aria-label={t.locked ? 'Unlock ticket' : 'Lock ticket'} icon={t.locked ? <LockOpen className="size-4" /> : <Lock className="size-4" />} onClick={() => toggleLock(t)} />
+            )}
+          </div>
+          <p className="text-xs text-slate-400">Uploaded by {t.uploadedByName} · {formatDateTime(t.createdAt) || 'syncing…'}</p>
+        </div>
+      </Card>
+    );
   };
 
   return (
@@ -282,10 +338,19 @@ export default function Tickets() {
 }
 
 const CLASSES = ['', 'SL', '3A', '3E', '2A', '1A', 'CC', 'EC', '2S', 'FC', 'Other'];
+const GENDER_LABEL: Record<string, string> = { M: 'Male', F: 'Female', O: 'Other' };
+const STATUS_SUGGESTIONS = ['CNF', 'RAC', 'WL', 'RLWL', 'GNWL', 'PQWL', 'CAN'];
+
+function StatusChip({ status, small }: { status: string; small?: boolean }) {
+  const kind = statusKind(status.split(' + ')[0]);
+  const tone = status.includes('+') ? 'bg-amber-100 text-amber-800' : kind === 'confirmed' ? 'bg-emerald-100 text-emerald-800' : kind === 'cancelled' ? 'bg-red-100 text-red-800' : kind === 'unknown' ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-800';
+  return <span className={`inline-block rounded-full font-bold ${tone} ${small ? 'mt-0.5 px-2 py-0.5 text-[11px]' : 'px-2.5 py-0.5 text-xs'}`}>{status}</span>;
+}
 
 function TicketForm({ ticket, onClose }: { ticket: Ticket | null; onClose: () => void }) {
   const me = useSession((s) => s.member)!;
   const members = useApprovedMembers();
+  const nameOf = (id: string) => members.find((m) => m.uid === id)?.displayName ?? '';
   const f = useForm({
     title: ticket?.title ?? '',
     pnr: ticket?.pnr ?? '',
@@ -296,15 +361,24 @@ function TicketForm({ ticket, onClose }: { ticket: Ticket | null; onClose: () =>
     destinationStation: ticket?.destinationStation ?? '',
     departureTime: ticket?.departureTime ?? '',
     arrivalTime: ticket?.arrivalTime ?? '',
-    coach: ticket?.coach ?? '',
-    seats: ticket?.seats ?? '',
     travelClass: ticket?.travelClass ?? '',
     notes: ticket?.notes ?? '',
-    extraNames: ticket?.passengerNames.join(', ') ?? '',
   });
-  const [passengers, setPassengers] = useState<string[]>(ticket?.passengerUids ?? []);
+  const [rows, setRows] = useState<TicketPassenger[]>(() => (ticket ? passengersOf(ticket, nameOf).map((p) => ({ ...p, status: p.status || 'CNF' })) : []));
   const [file, setFile] = useState<File | null>(null);
   const [stage, setStage] = useState<string | null>(null);
+
+  const linked = rows.filter((r) => r.personId).map((r) => r.personId);
+  const pickTravellers = (uids: string[]) => {
+    setRows((cur) => {
+      const kept = cur.filter((r) => !r.personId || uids.includes(r.personId));
+      const added = uids.filter((u) => !cur.some((r) => r.personId === u)).map((u) => emptyPassenger({ personId: u, name: nameOf(u), coach: cur[0]?.coach ?? '' }));
+      return [...kept, ...added];
+    });
+  };
+  const update = (i: number, patch: Partial<TicketPassenger>) => setRows((cur) => cur.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+  const removeRow = (i: number) => setRows((cur) => cur.filter((_, j) => j !== i));
+  const coachForAll = () => setRows((cur) => cur.map((r) => ({ ...r, coach: cur[0]?.coach ?? '' })));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,12 +390,13 @@ function TicketForm({ ticket, onClose }: { ticket: Ticket | null; onClose: () =>
     if (v.departureTime && !isClockTime(v.departureTime)) errs.departureTime = 'Invalid time.';
     if (v.arrivalTime && !isClockTime(v.arrivalTime)) errs.arrivalTime = 'Invalid time.';
     if (v.trainNumber && !/^[0-9A-Za-z]{1,10}$/.test(v.trainNumber.trim())) errs.trainNumber = 'Up to 10 letters/digits.';
-    const extraNames = v.extraNames.split(',').map((s) => s.trim()).filter(Boolean).slice(0, 50);
-    if (passengers.length + extraNames.length === 0) errs._form = 'Select at least one passenger (or type passenger names).';
+    const paxError = validatePassengers(rows);
+    if (paxError) errs._form = paxError;
     if (!ticket && !file) errs._form = 'Please attach the ticket PDF or photo.';
     f.setErrors(errs);
     if (Object.values(errs).some(Boolean)) return;
 
+    const derived = derivedTicketFields(rows);
     const input: TicketInput = {
       title: v.title.trim(),
       pnr: v.pnr.trim(),
@@ -332,12 +407,9 @@ function TicketForm({ ticket, onClose }: { ticket: Ticket | null; onClose: () =>
       destinationStation: v.destinationStation.trim().toUpperCase(),
       departureTime: v.departureTime,
       arrivalTime: v.arrivalTime,
-      passengerNames: extraNames,
-      passengerUids: passengers,
-      coach: v.coach.trim().toUpperCase(),
-      seats: v.seats.trim(),
       travelClass: v.travelClass,
       notes: v.notes.trim(),
+      ...derived,
     };
     try {
       const uploaded = file ? await uploadFile('ticket', file, setStage) : null;
@@ -353,6 +425,7 @@ function TicketForm({ ticket, onClose }: { ticket: Ticket | null; onClose: () =>
     }
   };
 
+  const small = 'w-full rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-sm';
   return (
     <Modal open onClose={onClose} title={ticket ? 'Edit ticket' : 'Upload ticket'} wide
       footer={<><Button variant="secondary" onClick={onClose} disabled={!!stage}>Cancel</Button><Button type="submit" form="ticket-form" loading={!!stage}>{stage ?? (ticket ? 'Save changes' : 'Upload & share')}</Button></>}>
@@ -360,24 +433,59 @@ function TicketForm({ ticket, onClose }: { ticket: Ticket | null; onClose: () =>
         <div className="sm:col-span-2">
           <FileInput kind="ticket" file={file} onChange={setFile} label="Ticket document" required={!ticket} existingName={ticket?.fileName} />
         </div>
-        <TextField className="sm:col-span-2" label="Ticket title" required maxLength={150} {...f.bind('title')} placeholder="Chennai → Coimbatore (Family 1)" />
+        <TextField className="sm:col-span-2" label="Ticket title" required maxLength={150} {...f.bind('title')} placeholder="Coimbatore → Chennai (Family 1)" />
         <TextField label="PNR number" inputMode="numeric" maxLength={10} {...f.bind('pnr')} />
         <TextField label="Journey date" type="date" {...f.bind('journeyDate')} />
-        <TextField label="Train name" maxLength={100} {...f.bind('trainName')} placeholder="Cheran Express" />
-        <TextField label="Train number" maxLength={10} {...f.bind('trainNumber')} placeholder="12673" />
-        <TextField label="Boarding station" maxLength={100} {...f.bind('boardingStation')} placeholder="MAS" />
-        <TextField label="Destination station" maxLength={100} {...f.bind('destinationStation')} placeholder="CBE" />
+        <TextField label="Train number" maxLength={10} {...f.bind('trainNumber')} placeholder="12672" />
+        <TextField label="Train name" maxLength={100} {...f.bind('trainName')} placeholder="NILAGIRI SF EXP" />
+        <TextField label="From (station code)" maxLength={100} {...f.bind('boardingStation')} placeholder="CBE" />
+        <TextField label="To (station code)" maxLength={100} {...f.bind('destinationStation')} placeholder="MAS" />
         <TextField label="Departure time" type="time" {...f.bind('departureTime')} />
         <TextField label="Arrival time" type="time" {...f.bind('arrivalTime')} />
-        <TextField label="Coach" maxLength={20} {...f.bind('coach')} placeholder="S4" />
-        <TextField label="Seat / berth" maxLength={200} {...f.bind('seats')} placeholder="21 LB, 22 MB, 23 UB" />
         <SelectField label="Class" {...f.bind('travelClass')}>
           {CLASSES.map((c) => <option key={c} value={c}>{c || 'Select class'}</option>)}
         </SelectField>
-        <div className="sm:col-span-2">
-          <MemberPicker label="Passengers (trip members)" members={members} selected={passengers} onChange={setPassengers} />
+
+        <div className="space-y-3 sm:col-span-2">
+          <MemberPicker label="Who is on this ticket?" members={members} selected={linked} onChange={pickTravellers} />
+          {rows.length > 0 && <p className="text-sm font-medium text-slate-700">Passenger details (as printed on the ticket)</p>}
+          <datalist id="pax-status">{STATUS_SUGGESTIONS.map((x) => <option key={x} value={x} />)}</datalist>
+          {rows.map((r, i) => (
+            <fieldset key={i} className="rounded-2xl border border-slate-200 p-3">
+              <legend className="sr-only">Passenger {i + 1}</legend>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-400">{i + 1}</span>
+                {r.personId ? (
+                  <span className="flex-1 font-semibold text-ink">{r.name}</span>
+                ) : (
+                  <input className={`${small} flex-1`} placeholder="Passenger name" aria-label={`Passenger ${i + 1} name`} maxLength={100} value={r.name} onChange={(e) => update(i, { name: e.target.value })} />
+                )}
+                <button type="button" onClick={() => removeRow(i)} className="rounded-full p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={`Remove ${r.name || `passenger ${i + 1}`}`}><X className="size-4" /></button>
+              </div>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                <label className="text-xs text-slate-500">Age<input className={small} inputMode="numeric" aria-label={`Age of ${r.name || `passenger ${i + 1}`}`} value={r.age || ''} onChange={(e) => update(i, { age: Number(e.target.value.replace(/\D/g, '')) || 0 })} /></label>
+                <label className="text-xs text-slate-500">Gender
+                  <select className={small} value={r.gender} onChange={(e) => update(i, { gender: e.target.value as TicketPassenger['gender'] })} aria-label={`Gender of ${r.name || `passenger ${i + 1}`}`}>
+                    <option value="">–</option><option value="M">Male</option><option value="F">Female</option><option value="O">Other</option>
+                  </select>
+                </label>
+                <label className="text-xs text-slate-500">Coach<input className={small} maxLength={10} placeholder="M2" aria-label={`Coach of ${r.name || `passenger ${i + 1}`}`} value={r.coach} onChange={(e) => update(i, { coach: e.target.value.toUpperCase() })} /></label>
+                <label className="text-xs text-slate-500">Berth no.<input className={small} maxLength={10} placeholder="58" aria-label={`Berth of ${r.name || `passenger ${i + 1}`}`} value={r.berth} onChange={(e) => update(i, { berth: e.target.value })} /></label>
+                <label className="text-xs text-slate-500">Berth
+                  <select className={small} value={r.berthType} onChange={(e) => update(i, { berthType: e.target.value as BerthType })} aria-label={`Berth type of ${r.name || `passenger ${i + 1}`}`}>
+                    {BERTH_TYPES.map((b) => <option key={b} value={b}>{b || '–'}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs text-slate-500">Status<input className={small} list="pax-status" maxLength={20} placeholder="CNF" aria-label={`Status of ${r.name || `passenger ${i + 1}`}`} value={r.status} onChange={(e) => update(i, { status: e.target.value.toUpperCase() })} /></label>
+              </div>
+            </fieldset>
+          ))}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="secondary" icon={<Plus className="size-4" />} onClick={() => setRows((cur) => [...cur, emptyPassenger({ coach: cur[0]?.coach ?? '' })])}>Add a passenger not in the list</Button>
+            {rows.length > 1 && rows[0].coach && <Button size="sm" variant="ghost" onClick={coachForAll}>Use coach {rows[0].coach} for everyone</Button>}
+          </div>
         </div>
-        <TextField className="sm:col-span-2" label="Other passenger names (comma separated)" {...f.bind('extraNames')} hint="For passengers without an account, e.g. children or elders." />
+
         <TextArea className="sm:col-span-2" label="Notes" maxLength={1000} {...f.bind('notes')} />
         <div className="sm:col-span-2"><FormError message={f.errors._form} /></div>
       </form>

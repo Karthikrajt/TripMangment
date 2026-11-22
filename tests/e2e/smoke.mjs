@@ -299,6 +299,45 @@ try {
   await admin.getByRole('heading', { name: 'Sample Lake Resort' }).waitFor();
   await shot(admin, 'vendors-to-accommodation');
   ok('Booked resort → "Add to Accommodation" opens a pre-filled hotel form');
+
+  // 14. Tickets: passenger list per ticket (made-up data; seeded directly because
+  // file uploads need Supabase, which the emulator setup does not have)
+  const S = (v) => ({ stringValue: v });
+  const seed = await fetch('http://127.0.0.1:8080/v1/projects/demo-trip/databases/(default)/documents/trips/main/tickets?documentId=legacy1', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: {
+      title: S('Test journey'), pnr: S('1000000009'), trainName: S('SAMPLE SF EXP'), trainNumber: S('10009'), journeyDate: S('2027-01-18'),
+      boardingStation: S('AAA'), destinationStation: S('BBB'), departureTime: S(''), arrivalTime: S(''), coach: S('M2'), seats: S(''),
+      travelClass: S('3E'), notes: S(''), passengerUids: { arrayValue: {} }, passengerNames: { arrayValue: { values: [S('Guest One')] } },
+      filePath: S('trips/main/ticket/x/legacy1.pdf'), fileName: S('t.pdf'), fileType: S('application/pdf'), fileSize: { integerValue: '1000' },
+      uploadedBy: S('x'), uploadedByName: S('Test Admin'), locked: { booleanValue: false }, createdAt: { timestampValue: new Date().toISOString() },
+    } }),
+  });
+  if (!seed.ok) throw new Error('could not seed ticket: ' + (await seed.text()));
+  await admin.goto(`${BASE}/tickets`);
+  await admin.getByText('PNR').first().waitFor();
+  await admin.getByRole('list', { name: 'Passengers' }).getByText('Guest One').waitFor();
+  ok('Older ticket (no passenger details yet) still shows its passengers');
+
+  await admin.getByRole('button', { name: 'Edit' }).first().click();
+  await admin.getByRole('group', { name: /Who is on this ticket/ }).getByRole('checkbox', { name: /Ravi Kumar/ }).check();
+  await admin.getByLabel('Berth of Guest One').fill('57');
+  await admin.getByLabel('Berth type of Guest One').selectOption('LB');
+  await admin.getByLabel('Berth of Ravi Kumar').fill('58');
+  await admin.getByLabel('Berth type of Ravi Kumar').selectOption('MB');
+  await admin.getByLabel('Age of Ravi Kumar').fill('36');
+  await admin.getByLabel('Status of Ravi Kumar').fill('rlwl 4');
+  await admin.getByRole('button', { name: 'Use coach M2 for everyone' }).click();
+  await admin.getByRole('button', { name: 'Save changes' }).click();
+  const paxList = admin.getByRole('list', { name: 'Passengers' });
+  await paxList.getByText('M2 · 58 MB').waitFor();
+  await paxList.getByText('M2 · 57 LB').waitFor();
+  await paxList.getByText('RLWL 4').waitFor();
+  await admin.getByText('CNF + WL').waitFor();
+  await admin.getByText('YOU', { exact: true }).waitFor();
+  await shot(admin, 'ticket-passengers');
+  ok('Passenger details per ticket: coach · berth, status, "YOU" marker, ticket status summary');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

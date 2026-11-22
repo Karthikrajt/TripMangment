@@ -8,7 +8,7 @@ export type TicketInput = Pick<
   Ticket,
   | 'title' | 'pnr' | 'trainName' | 'trainNumber' | 'journeyDate' | 'boardingStation' | 'destinationStation'
   | 'departureTime' | 'arrivalTime' | 'passengerNames' | 'passengerUids' | 'coach' | 'seats' | 'travelClass' | 'notes'
->;
+> & Pick<Ticket, 'passengers'>;
 
 export async function createTicket(input: TicketInput, file: UploadedFile, by: { uid: string; name: string }): Promise<string> {
   const id = newId();
