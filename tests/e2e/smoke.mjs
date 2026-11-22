@@ -45,7 +45,7 @@ try {
   await admin.getByLabel('Start date').fill('2026-12-20');
   await admin.getByLabel('End date').fill('2026-12-22');
   await admin.getByRole('button', { name: 'Create trip' }).click();
-  await admin.getByText('Admin dashboard').waitFor();
+  await admin.getByText('Admin dashboard', { exact: true }).waitFor();
   ok('Bootstrap admin created the trip and sees the admin dashboard');
 
   // 2. A new user requests access

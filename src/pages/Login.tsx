@@ -24,13 +24,13 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-dvh bg-gradient-to-b from-brand-700 to-brand-800 px-4 py-10 text-white">
+    <div className="min-h-dvh bg-gradient-to-br from-brand-700 via-brand-600 to-brand-400 px-4 py-10 text-white">
       <div className="mx-auto flex max-w-md flex-col items-center text-center">
         <span className="rounded-3xl bg-white/15 p-4">
           <Plane className="size-10" />
         </span>
         <h1 className="mt-5 text-3xl font-bold">Trip Manager</h1>
-        <p className="mt-2 text-brand-100 text-lg">Tickets, plans, hotel, transport, expenses and chat for our trip – all in one place.</p>
+        <p className="mt-2 text-white/85 text-lg">Tickets, plans, hotel, transport, expenses and chat for our trip – all in one place.</p>
 
         <ul className="mt-8 grid w-full grid-cols-2 gap-3 text-left text-sm">
           {[
@@ -48,7 +48,7 @@ export default function Login() {
           })}
         </ul>
 
-        <div className="mt-8 w-full rounded-2xl bg-white p-5 text-left text-slate-800 shadow-xl">
+        <div className="mt-8 w-full rounded-3xl bg-white p-5 text-left text-slate-800 shadow-xl">
           <Button size="lg" className="w-full" onClick={go} loading={busy}>
             <svg viewBox="0 0 48 48" className="size-6 rounded-full bg-white p-0.5" aria-hidden>
               <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
@@ -70,7 +70,7 @@ export default function Login() {
             <FormError message={error} />
           </div>
         </div>
-        <p className="mt-6 text-sm text-brand-100">New here? Sign in, then ask to join – the trip admin will approve you.</p>
+        <p className="mt-6 text-sm text-white/85">New here? Sign in, then ask to join – the trip admin will approve you.</p>
       </div>
     </div>
   );

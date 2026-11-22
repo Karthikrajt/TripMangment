@@ -32,7 +32,7 @@ function SideLink({ item, badge, onClick }: { item: NavItem; badge: number; onCl
       to={item.to}
       onClick={onClick}
       aria-current={active ? 'page' : undefined}
-      className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] font-medium transition-colors ${active ? 'bg-brand-700 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
+      className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-[15px] font-medium transition-colors ${active ? 'bg-brand-700 text-white shadow-[0_6px_16px_rgb(36_83_255/0.25)]' : 'text-slate-600 hover:bg-brand-50 hover:text-brand-800'}`}
     >
       <Icon className="size-5 shrink-0" aria-hidden />
       <span className="truncate">{item.label}</span>
@@ -71,9 +71,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-dvh lg:pl-72">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-72 flex-col border-r border-slate-200 bg-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 flex-col border-r border-slate-100 bg-white lg:flex">
         <Link to="/" className="flex items-center gap-3 px-5 py-5 border-b border-slate-100">
-          <span className="rounded-xl bg-brand-700 p-2 text-white">
+          <span className="rounded-2xl bg-gradient-to-br from-brand-700 to-brand-500 p-2 text-white shadow-[0_6px_16px_rgb(36_83_255/0.3)]">
             <Plane className="size-5" />
           </span>
           <span className="min-w-0">
@@ -97,24 +97,24 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden safe-top">
+      <header className="sticky top-0 z-30 flex items-center gap-3 bg-brand-700 px-4 py-3 text-white lg:hidden safe-top">
         <Link to="/" className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="rounded-lg bg-brand-700 p-1.5 text-white">
+          <span className="rounded-xl bg-white/15 p-1.5">
             <Plane className="size-4" />
           </span>
-          <span className="truncate font-bold text-slate-900">{trip?.name ?? 'Trip Manager'}</span>
+          <span className="truncate font-bold">{trip?.name ?? 'Trip Manager'}</span>
         </Link>
-        <Link to="/notifications" className="relative rounded-full p-2 text-slate-600 hover:bg-slate-100" aria-label={`Notifications${badges.notifications ? `, ${badges.notifications} unread` : ''}`}>
+        <Link to="/notifications" className="relative rounded-full p-2 text-white/90 hover:bg-white/10" aria-label={`Notifications${badges.notifications ? `, ${badges.notifications} unread` : ''}`}>
           <Bell className="size-6" />
-          {badges.notifications > 0 && <span className="absolute right-1 top-1 size-2.5 rounded-full bg-rose-600" />}
+          {badges.notifications > 0 && <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-amber-400 ring-2 ring-brand-700" />}
         </Link>
-        <Link to="/profile" aria-label="Profile">
-          <Avatar name={member?.displayName ?? ''} photo={member?.photoURL} size={34} />
+        <Link to="/profile" aria-label="Profile" className="rounded-full ring-2 ring-white/60">
+          <Avatar name={member?.displayName ?? ''} photo={member?.photoURL} size={32} />
         </Link>
       </header>
 
       {!online && (
-        <div className="sticky top-[57px] lg:top-0 z-20 flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900" role="status">
+        <div className="sticky top-[58px] lg:top-0 z-20 flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900" role="status">
           <WifiOff className="size-4" /> You are offline – showing saved data. New expenses will sync automatically.
         </div>
       )}
@@ -122,20 +122,24 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 lg:pb-10 lg:pt-8">{children}</main>
 
       {/* Mobile bottom navigation */}
-      <nav aria-label="Quick" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white safe-bottom lg:hidden">
+      <nav aria-label="Quick" className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 rounded-t-3xl bg-white shadow-[0_-4px_20px_rgb(17_26_46/0.08)] safe-bottom lg:hidden">
         {bottomNav.map((it) => {
           const Icon = it.icon;
           const n = it.badge ? badges[it.badge] : 0;
           return (
-            <NavLink key={it.to} to={it.to} end={it.to === '/'} className={() => `relative flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold ${isActive(it.to) ? 'text-brand-700' : 'text-slate-500'}`}>
-              <Icon className="size-6" aria-hidden />
+            <NavLink key={it.to} to={it.to} end={it.to === '/'} className={() => `relative flex flex-col items-center gap-0.5 py-2 text-xs font-semibold ${isActive(it.to) ? 'text-brand-700' : 'text-slate-500'}`}>
+              <span className={`rounded-full px-4 py-1 transition-colors ${isActive(it.to) ? 'bg-brand-50' : ''}`}>
+                <Icon className="size-6" aria-hidden />
+              </span>
               {it.label}
               {n > 0 && <span className="absolute right-[22%] top-1.5 min-w-4 rounded-full bg-rose-600 px-1 text-[10px] leading-4 text-white">{n > 9 ? '9+' : n}</span>}
             </NavLink>
           );
         })}
-        <button onClick={() => setMoreOpen(true)} className="relative flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold text-slate-500">
-          <Menu className="size-6" aria-hidden />
+        <button onClick={() => setMoreOpen(true)} className="relative flex flex-col items-center gap-0.5 py-2 text-xs font-semibold text-slate-500">
+          <span className="rounded-full px-4 py-1">
+            <Menu className="size-6" aria-hidden />
+          </span>
           More
           {badges.approvals + badges.review > 0 && <span className="absolute right-[22%] top-1.5 size-2.5 rounded-full bg-rose-600" />}
         </button>

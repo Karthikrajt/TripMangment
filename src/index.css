@@ -1,16 +1,25 @@
+@import "@fontsource-variable/plus-jakarta-sans";
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-200: #99f6e4;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
+  /* Fresh Blue: one confident blue, white floating cards, soft cool-grey ground. */
+  --color-brand-50: #eef2ff;
+  --color-brand-100: #dfe7ff;
+  --color-brand-200: #c2d1ff;
+  --color-brand-300: #9db4ff;
+  --color-brand-400: #6f8fff;
+  --color-brand-500: #4f7bff;
+  --color-brand-600: #3366ff;
+  --color-brand-700: #2453ff;
+  --color-brand-800: #1c41d4;
+  --color-brand-900: #1a36a8;
+  --color-ground: #f4f7fb;
+  --color-ink: #111a2e;
   --color-sun-400: #fbbf24;
   --color-sun-500: #f59e0b;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --shadow-soft: 0 2px 12px rgb(17 26 46 / 0.06);
+  --shadow-float: 0 10px 28px rgb(36 83 255 / 0.16);
 }
 
 html {
@@ -18,7 +27,7 @@ html {
   color-scheme: light;
 }
 body {
-  @apply bg-slate-50 text-slate-800 antialiased;
+  @apply bg-ground text-slate-800 antialiased;
   font-size: 16px;
   line-height: 1.5;
 }

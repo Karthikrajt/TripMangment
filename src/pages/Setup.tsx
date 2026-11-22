@@ -43,7 +43,7 @@ export default function Setup() {
   };
 
   return (
-    <div className="min-h-dvh bg-slate-50 px-4 py-10">
+    <div className="min-h-dvh bg-ground px-4 py-10">
       <div className="mx-auto max-w-lg">
         <div className="mb-6 flex flex-col items-center text-center">
           <span className="rounded-2xl bg-brand-700 p-3 text-white">

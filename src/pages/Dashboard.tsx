@@ -39,31 +39,49 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      {/* Hero */}
-      <section className="overflow-hidden rounded-3xl bg-gradient-to-br from-brand-700 to-brand-800 p-6 text-white shadow-md sm:p-8">
-        <p className="text-brand-100">{admin ? 'Admin dashboard' : `Hello, ${member?.displayName.split(' ')[0] ?? ''} 👋`}</p>
-        <h1 className="mt-1 text-2xl font-bold sm:text-3xl">{trip?.name}</h1>
-        <p className="mt-1 text-lg text-brand-100">
-          {trip?.destination} · {formatDate(trip?.startDate)} to {formatDate(trip?.endDate)}
-        </p>
-        <div className="mt-5 inline-flex items-center gap-3 rounded-2xl bg-white/15 px-4 py-3">
-          {phase.phase === 'before' && (
-            <>
-              <span className="text-4xl font-bold tabular-nums">{phase.daysToGo}</span>
-              <span className="text-lg leading-tight">{phase.daysToGo === 1 ? 'day' : 'days'} to go</span>
-            </>
-          )}
-          {phase.phase === 'during' && (
-            <>
-              <span className="text-4xl font-bold">Day {phase.dayNumber}</span>
-              <span className="text-lg leading-tight">of {phase.totalDays} · Have a great trip!</span>
-            </>
-          )}
-          {phase.phase === 'after' && <span className="text-lg">Trip completed – hope you had fun! 🎉</span>}
-          {phase.phase === 'unknown' && <span className="text-lg">Dates not set yet</span>}
+      {/* Hero: blue gradient band with the countdown in a floating card */}
+      <section className="relative -mx-4 -mt-5 sm:mx-0 sm:mt-0">
+        <div className="bg-gradient-to-br from-brand-700 via-brand-600 to-brand-400 px-5 pb-16 pt-6 text-white sm:rounded-3xl sm:px-8 sm:pt-8">
+          <p className="text-sm font-medium text-white/80">{admin ? 'Admin dashboard' : `Hello, ${member?.displayName.split(' ')[0] ?? ''} 👋`}</p>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">{trip?.name}</h1>
+          <p className="mt-1 text-white/85">
+            {trip?.destination} · {formatDate(trip?.startDate)} to {formatDate(trip?.endDate)}
+          </p>
         </div>
-        <div className="mt-3"><span className="text-brand-100 [&_p]:text-brand-100"><LastSynced syncKey="trip" /></span></div>
+        <div className="relative mx-4 -mt-11 flex flex-wrap items-center justify-between gap-3 rounded-3xl bg-white p-4 shadow-float sm:mx-6 sm:p-5">
+          <div className="flex items-baseline gap-2">
+            {phase.phase === 'before' && (
+              <>
+                <span className="text-sm font-medium text-slate-500">Trip starts in</span>
+                <span className="text-3xl font-extrabold tabular-nums text-brand-700">{phase.daysToGo}</span>
+                <span className="font-semibold text-slate-700">{phase.daysToGo === 1 ? 'day' : 'days'}</span>
+              </>
+            )}
+            {phase.phase === 'during' && (
+              <>
+                <span className="text-3xl font-extrabold text-brand-700">Day {phase.dayNumber}</span>
+                <span className="font-semibold text-slate-700">of {phase.totalDays} · have a great trip!</span>
+              </>
+            )}
+            {phase.phase === 'after' && <span className="text-lg font-bold text-ink">Trip completed – hope you had fun! 🎉</span>}
+            {phase.phase === 'unknown' && <span className="text-lg font-bold text-ink">Dates not set yet</span>}
+          </div>
+          <div className="text-right text-sm text-slate-500">
+            <p><b className="text-ink">{approved.length}</b> people · <b className="text-ink">{formatINR(total)}</b> spent</p>
+            <LastSynced syncKey="trip" />
+          </div>
+        </div>
       </section>
+
+      {/* Quick access */}
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
+        <QuickCard to="/tickets" icon={<Ticket className="size-6" />} label="View Tickets" />
+        <QuickCard to="/itinerary" icon={<CalendarDays className="size-6" />} label="Itinerary" tone="sky" />
+        <QuickCard to="/accommodation" icon={<Hotel className="size-6" />} label="Hotel Details" tone="violet" />
+        <QuickCard to="/transport" icon={<Bus className="size-6" />} label="Transport" tone="sun" />
+        <QuickCard to="/expenses/new" icon={<Receipt className="size-6" />} label="Add Expense" tone="emerald" />
+        <QuickCard to="/chat" icon={<MessagesSquare className="size-6" />} label="Group Chat" tone="rose" />
+      </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -91,16 +109,6 @@ export default function Dashboard() {
           )}
         </div>
       )}
-
-      {/* Quick access */}
-      <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-        <QuickCard to="/tickets" icon={<Ticket className="size-6" />} label="View Tickets" />
-        <QuickCard to="/itinerary" icon={<CalendarDays className="size-6" />} label="Itinerary" tone="sky" />
-        <QuickCard to="/accommodation" icon={<Hotel className="size-6" />} label="Hotel Details" tone="violet" />
-        <QuickCard to="/transport" icon={<Bus className="size-6" />} label="Transport" tone="sun" />
-        <QuickCard to="/expenses/new" icon={<Receipt className="size-6" />} label="Add Expense" tone="emerald" />
-        <QuickCard to="/chat" icon={<MessagesSquare className="size-6" />} label="Group Chat" tone="rose" />
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

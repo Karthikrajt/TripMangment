@@ -27,10 +27,10 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} max-h-[92dvh] flex flex-col rounded-t-3xl sm:rounded-2xl bg-white shadow-xl focus:outline-none`}
+        className={`w-full ${wide ? 'sm:max-w-3xl' : 'sm:max-w-lg'} max-h-[92dvh] flex flex-col rounded-t-[28px] sm:rounded-3xl bg-white shadow-xl focus:outline-none`}
       >
         <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+          <h2 className="text-lg font-bold text-ink">{title}</h2>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Close">
             <X className="size-5" />
           </button>

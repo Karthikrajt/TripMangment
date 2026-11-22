@@ -35,7 +35,7 @@ export default function Pending() {
 
   const status = member?.status;
   return (
-    <div className="min-h-dvh bg-slate-50 px-4 py-10">
+    <div className="min-h-dvh bg-ground px-4 py-10">
       <div className="mx-auto max-w-lg space-y-4">
         <div className="text-center">
           <p className="text-slate-500">Signed in as {user?.email}</p>
