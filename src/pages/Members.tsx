@@ -1,3 +1,4 @@
+import { isValidUpiId } from '../domain/upi';
 import { useMemo, useState } from 'react';
 import { Mail, Phone, Pencil, Shield, ShieldOff, UserX, UserCheck, Trash2, Users, UserPlus, LogIn, Baby, Plus, LayoutList, UsersRound } from 'lucide-react';
 import { FamilyManager } from '../components/FamilyManager';
@@ -246,6 +247,7 @@ export function PersonForm({ person, family, onClose }: { person: Member | null;
     email: person?.hasLogin === false ? person.email : '',
     phone: person?.phone ?? '',
     emergencyContact: person?.emergencyContact ?? '',
+    upiId: person?.upiId ?? '',
     ageGroup: (person ? ageGroupOf(person) : 'adult') as AgeGroup,
     customShare: person ? hasCustomShare(person) : false,
     shareWeight: String(person ? weightOf(person, shareDefaults) : 100),
@@ -261,6 +263,7 @@ export function PersonForm({ person, family, onClose }: { person: Member | null;
     if (!v.displayName.trim()) return setError('Name is required.');
     if (v.phone && !isPhone(v.phone)) return setError('Invalid mobile number.');
     if (v.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.email.trim())) return setError('Invalid email address.');
+    if (v.upiId.trim() && !isValidUpiId(v.upiId)) return setError('UPI ID looks wrong. It is like name@okicici or 98xxxxxx@ybl.');
     const w = Number(v.shareWeight);
     if (v.customShare && (!Number.isInteger(w) || w < 0 || w > 100)) return setError('Share must be a whole number from 0 to 100.');
     const relationship = familyChoice === '__new' ? newFamily.trim() : familyChoice;
@@ -271,6 +274,7 @@ export function PersonForm({ person, family, onClose }: { person: Member | null;
         displayName: v.displayName,
         phone: v.phone,
         emergencyContact: v.emergencyContact,
+        upiId: v.upiId,
         relationship: admin || !person ? relationship : person.relationship,
         email: offline ? v.email : undefined,
         ageGroup: admin ? v.ageGroup : undefined,
@@ -329,6 +333,7 @@ export function PersonForm({ person, family, onClose }: { person: Member | null;
         {offline && admin && <TextField label="Email (optional)" type="email" maxLength={200} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} hint="Not needed. Only used to recognise them if they sign in later." />}
         <TextField label="Mobile number" inputMode="tel" maxLength={30} value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} />
         <TextField label="Emergency contact" maxLength={200} value={v.emergencyContact} onChange={(e) => setV({ ...v, emergencyContact: e.target.value })} placeholder="Name – phone" />
+        <TextField label="UPI ID (optional)" maxLength={100} autoCapitalize="none" autoCorrect="off" spellCheck={false} value={v.upiId} onChange={(e) => setV({ ...v, upiId: e.target.value })} placeholder="name@okicici" hint="So others can pay you back in one tap from Settlement." />
         <FormError message={error} />
       </div>
     </Modal>

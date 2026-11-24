@@ -1,3 +1,6 @@
+import { ShareWhatsApp } from '../components/ShareWhatsApp';
+import { RollCallButton } from '../components/RollCallButton';
+import { pickupText } from '../domain/share';
 import { personIdOf } from '../domain/people';
 import { useState } from 'react';
 import { Bus, Pencil, Plus, Trash2, MapPin, Clock, User } from 'lucide-react';
@@ -60,6 +63,8 @@ export default function Transport() {
                 <div className="flex flex-wrap gap-2">
                   <CallButton phone={v.driverPhone} label="Call driver" />
                   <MapButton url={v.mapsUrl} address={v.mapsUrl ? undefined : v.pickupLocation} label="Navigate to pickup" />
+                  <ShareWhatsApp text={() => pickupText(v, v.memberUids.map((id) => members.find((m) => m.uid === id)?.displayName ?? '').filter(Boolean))} label="Share" />
+                  {v.memberUids.length > 0 && <RollCallButton title={`${v.vehicleType} pickup – ${formatTime(v.pickupTime) || formatDate(v.pickupDate)}`} personIds={v.memberUids} />}
                 </div>
                 {admin && (
                   <div className="flex gap-1 border-t border-slate-100 pt-2">

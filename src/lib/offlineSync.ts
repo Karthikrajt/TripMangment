@@ -18,7 +18,7 @@ import type { Ticket } from '../domain/types';
 const WARM_KEY = 'tm.lastWarm';
 const AUTO_KEY = 'tm.autoOfflineTickets';
 const WARM_EVERY_MS = 6 * 60 * 60 * 1000;
-const COLLECTIONS = ['itinerary', 'tickets', 'accommodations', 'rooms', 'transport', 'vendors', 'expenses', 'settlements'];
+const COLLECTIONS = ['itinerary', 'tickets', 'accommodations', 'rooms', 'transport', 'vendors', 'expenses', 'settlements', 'checklist', 'rollcalls'];
 
 const read = (k: string) => {
   try {

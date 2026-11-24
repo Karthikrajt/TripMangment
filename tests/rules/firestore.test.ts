@@ -354,3 +354,72 @@ describe('chat & notifications', () => {
     await assertSucceeds(getDocs(query(collection(db('owner'), `trips/${T}/notifications`), where('target', 'in', ['all', 'admins', 'owner']))));
   });
 });
+
+describe('UPI pay & payment confirmation', () => {
+  const settle = (extra: Record<string, unknown> = {}) => ({
+    fromUid: 'alice', toUid: 'bob', amountPaise: 50000, status: 'reported', paidDate: '2026-12-22', reference: '', notes: '',
+    createdBy: 'alice', createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra,
+  });
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const f = ctx.firestore();
+      await updateDoc(doc(f, `trips/${T}/members/alice`), { relationship: 'Fam A' });
+      await setDoc(doc(f, `trips/${T}/members/p_kid`), { ...memberDoc('p_kid', 'member', 'approved'), hasLogin: false, relationship: 'Fam A' });
+      await setDoc(doc(f, `trips/${T}/members/p_other`), { ...memberDoc('p_other', 'member', 'approved'), hasLogin: false, relationship: 'Fam B' });
+    });
+  });
+  it('members can save their own UPI ID (and not someone else’s)', async () => {
+    await assertSucceeds(updateDoc(doc(db('alice'), `trips/${T}/members/alice`), { upiId: 'alice@okicici' }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/bob`), { upiId: 'alice@okicici' }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/members/alice`), { upiId: 'x'.repeat(101) }));
+  });
+  it('payer can report "I’ve paid" for themselves or their family only', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/settlements/s1`), settle()));
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/settlements/s2`), settle({ fromUid: 'p_kid' })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/settlements/s3`), settle({ fromUid: 'p_other' })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/settlements/s4`), settle({ status: 'paid' })));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/settlements/s5`), settle({ createdBy: 'bob' })));
+    await assertFails(setDoc(doc(db('pete'), `trips/${T}/settlements/s6`), settle({ fromUid: 'pete', createdBy: 'pete' })));
+  });
+  it('only the receiver or an admin confirms; payer can cancel an unconfirmed report', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/settlements/s1`), settle()));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}/settlements/s1`), { status: 'paid' }));
+    await assertFails(updateDoc(doc(db('bob'), `trips/${T}/settlements/s1`), { status: 'paid', amountPaise: 1 }));
+    await assertSucceeds(updateDoc(doc(db('bob'), `trips/${T}/settlements/s1`), { status: 'paid', updatedAt: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(db('alice'), `trips/${T}/settlements/s1`)));
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/settlements/s2`), settle()));
+    await assertFails(deleteDoc(doc(db('bob'), `trips/${T}/settlements/s2`)));
+    await assertSucceeds(deleteDoc(doc(db('alice'), `trips/${T}/settlements/s2`)));
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/settlements/s3`), settle()));
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}/settlements/s3`), { status: 'paid' }));
+  });
+});
+
+describe('checklist & roll call', () => {
+  const item = (by: string, extra: Record<string, unknown> = {}) => ({ title: 'ID card', scope: 'person', done: {}, createdBy: by, createdByName: by, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra });
+  const roll = (by: string, extra: Record<string, unknown> = {}) => ({ title: 'Boarding', personIds: ['alice', 'bob'], present: {}, open: true, createdBy: by, createdByName: by, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra });
+  it('members add items and anyone approved can tick; only creator/admin edit or delete', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/checklist/c1`), item('alice')));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/checklist/c2`), item('bob')));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/checklist/c3`), item('alice', { scope: 'everyone' })));
+    await assertFails(setDoc(doc(db('pete'), `trips/${T}/checklist/c4`), item('pete')));
+    await assertSucceeds(updateDoc(doc(db('bob'), `trips/${T}/checklist/c1`), { 'done.bob': true, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db('bob'), `trips/${T}/checklist/c1`), { title: 'Changed' }));
+    await assertFails(deleteDoc(doc(db('bob'), `trips/${T}/checklist/c1`)));
+    await assertSucceeds(updateDoc(doc(db('alice'), `trips/${T}/checklist/c1`), { title: 'Aadhaar card' }));
+    await assertSucceeds(deleteDoc(doc(db('owner'), `trips/${T}/checklist/c1`)));
+  });
+  it('anyone marks present while open; only the starter/admin closes it', async () => {
+    await assertSucceeds(setDoc(doc(db('alice'), `trips/${T}/rollcalls/r1`), roll('alice')));
+    await assertFails(setDoc(doc(db('alice'), `trips/${T}/rollcalls/r2`), roll('alice', { open: false })));
+    await assertSucceeds(updateDoc(doc(db('bob'), `trips/${T}/rollcalls/r1`), { 'present.bob': true, updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(doc(db('bob'), `trips/${T}/rollcalls/r1`), { open: false }));
+    await assertSucceeds(updateDoc(doc(db('alice'), `trips/${T}/rollcalls/r1`), { open: false }));
+    await assertFails(updateDoc(doc(db('bob'), `trips/${T}/rollcalls/r1`), { 'present.alice': true }));
+    await assertFails(getDoc(doc(db('pete'), `trips/${T}/rollcalls/r1`)));
+  });
+  it('reminder markers are server-only', async () => {
+    await assertFails(getDoc(doc(db('owner'), `trips/${T}/reminders/plan-2026-12-20`)));
+    await assertFails(setDoc(doc(db('owner'), `trips/${T}/reminders/x`), { a: 1 }));
+  });
+});

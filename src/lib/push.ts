@@ -45,3 +45,31 @@ export async function listenForeground(cb: (title: string) => void) {
   return onMessage(getMessaging(app), (p) => cb(p.notification?.title ?? 'New notification'));
 }
 
+
+/** iPhone/iPad Safari only allows web push after "Add to Home Screen". */
+export function needsHomeScreenForPush(): boolean {
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const standalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  return ios && !standalone;
+}
+
+/**
+ * Keep this device's token fresh. FCM tokens can change (browser update,
+ * storage cleared); re-registering once per app start keeps reminders arriving.
+ */
+export async function refreshPush(uid: string): Promise<void> {
+  try {
+    if (!pushEnabledLocally() || !(await pushSupported())) return;
+    const registration = await navigator.serviceWorker.ready;
+    const token = await getToken(getMessaging(app), { vapidKey: env.vapidKey, serviceWorkerRegistration: registration });
+    if (!token) return;
+    const ref = doc(db, tripPath('pushTokens', uid));
+    const snap = await getDoc(ref);
+    const tokens: string[] = snap.exists() ? (snap.data().tokens as string[]) ?? [] : [];
+    if (tokens[0] === token && localStorage.getItem('tm.pushToken') === token) return;
+    await setDoc(ref, { tokens: [token, ...tokens.filter((t) => t !== token && t !== localStorage.getItem('tm.pushToken'))].slice(0, 5), updatedAt: serverTimestamp() });
+    localStorage.setItem('tm.pushToken', token);
+  } catch {
+    /* best-effort */
+  }
+}

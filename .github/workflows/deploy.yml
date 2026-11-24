@@ -49,11 +49,18 @@ jobs:
 
       - name: Deploy Supabase Edge Functions
         if: ${{ env.SUPABASE_ACCESS_TOKEN != '' }}
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
           P="$VITE_FIREBASE_PROJECT_ID"
+          # FCM_SERVICE_ACCOUNT lets the notify function send push notifications
+          # (base64 so the JSON survives as one value; never printed).
+          FCM_B64="$(printf '%s' "$SA_JSON" | base64 -w0)"
+          echo "::add-mask::$FCM_B64"
           npx -y supabase@2 secrets set --project-ref "$SUPABASE_PROJECT_REF" \
             FIREBASE_PROJECT_ID="$P" TRIP_ID=main APP_URL="https://$P.web.app" \
-            ALLOWED_ORIGINS="https://$P.web.app,https://$P.firebaseapp.com,http://localhost:5173"
+            ALLOWED_ORIGINS="https://$P.web.app,https://$P.firebaseapp.com,http://localhost:5173" \
+            FCM_SERVICE_ACCOUNT="$FCM_B64"
           npx -y supabase@2 functions deploy files --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
           npx -y supabase@2 functions deploy notify --no-verify-jwt --project-ref "$SUPABASE_PROJECT_REF"
 

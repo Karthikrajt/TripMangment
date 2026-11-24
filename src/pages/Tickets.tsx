@@ -1,3 +1,6 @@
+import { ShareWhatsApp } from '../components/ShareWhatsApp';
+import { RollCallButton } from '../components/RollCallButton';
+import { ticketText } from '../domain/share';
 import { personIdOf } from '../domain/people';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -19,7 +22,7 @@ import { canEditTicket } from '../domain/permissions';
 import { createTicket, deleteTicket, setTicketLock, updateTicket, type TicketInput } from '../services/tickets';
 import { uploadFile, filesConfigured } from '../lib/files';
 import { listOffline, openBlob, removeOffline, saveOffline, getOffline } from '../lib/offlineFiles';
-import { formatDateLong, formatDateTime, formatTime, todayIST } from '../lib/format';
+import { formatDateLong, formatDateTime, formatTime, todayIST, formatDate } from '../lib/format';
 import {
   applyFilters, dateOptions, EMPTY_FILTERS, hasActiveFilters, isTicketCompleted, matchesTab, pruneSelection, splitByCompletion, trainOptions,
   type FilterContext, type TicketFilterState,
@@ -261,6 +264,11 @@ export default function Tickets() {
           </ul>
 
           {t.notes && <p className="text-sm text-slate-600">📝 {t.notes}</p>}
+
+          <div className="flex flex-wrap gap-2">
+            <ShareWhatsApp size="sm" label="Share details" text={() => ticketText(t, pax)} />
+            {!completed && t.passengerUids.length > 0 && <RollCallButton size="sm" title={`Boarding ${t.trainName || t.title} – ${formatDate(t.journeyDate)}`} personIds={t.passengerUids} />}
+          </div>
 
           <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
             {online ? (

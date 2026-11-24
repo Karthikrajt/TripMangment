@@ -1,6 +1,8 @@
+import { ShareWhatsApp } from '../components/ShareWhatsApp';
+import { liveText, pickupText } from '../domain/share';
 import { personIdOf } from '../domain/people';
 import { Link } from 'react-router-dom';
-import { Bus, CalendarDays, Hotel, Megaphone, MessagesSquare, Phone, Receipt, ShieldAlert, Ticket, Train, BedDouble } from 'lucide-react';
+import { Bus, CalendarDays, Hotel, Megaphone, MessagesSquare, Phone, Receipt, ShieldAlert, Ticket, Train, BedDouble, ListChecks, UserCheck } from 'lucide-react';
 import { useSession } from '../store/session';
 import { berthLabel, passengersOf } from '../domain/ticketPassengers';
 import { useAccommodations, useAnnouncements, useItinerary, useRooms, useTickets, useTransport } from '../hooks/data';
@@ -41,6 +43,7 @@ export default function Live() {
           <h1 className="text-2xl font-bold">{formatDateLong(today)}</h1>
           <LastSynced syncKey="itinerary" />
         </div>
+        <ShareWhatsApp size="sm" label="Share today" text={() => liveText({ tripName: trip?.name ?? 'Trip', date: items.length ? today : schedule[0]?.date ?? today, items: schedule, hotel, vehicle: vehicle && vehicle.pickupDate >= today ? vehicle : undefined })} />
       </div>
 
       {announcements.data[0] && (
@@ -91,6 +94,7 @@ export default function Live() {
                 <div className="flex flex-wrap gap-2">
                   <CallButton phone={vehicle.driverPhone} label="Call driver" />
                   <MapButton url={vehicle.mapsUrl} address={vehicle.mapsUrl ? undefined : vehicle.pickupLocation} label="Navigate" />
+                  <ShareWhatsApp text={() => pickupText(vehicle, vehicle.memberUids.map((id) => members.find((m) => m.uid === id)?.displayName ?? '').filter(Boolean))} label="Share" />
                 </div>
               </>
             ) : <p className="text-slate-500">No transport added.</p>}
@@ -141,6 +145,8 @@ export default function Live() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        <ButtonLink to="/checklist" size="lg" variant="secondary" icon={<UserCheck className="size-5" />}>Roll call</ButtonLink>
+        <ButtonLink to="/checklist" size="lg" variant="secondary" icon={<ListChecks className="size-5" />}>Checklist</ButtonLink>
         <ButtonLink to="/chat" size="lg" variant="secondary" icon={<MessagesSquare className="size-5" />}>Group chat</ButtonLink>
         <ButtonLink to="/expenses/new" size="lg" variant="secondary" icon={<Receipt className="size-5" />}>Add expense</ButtonLink>
       </div>

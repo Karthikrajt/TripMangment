@@ -86,6 +86,25 @@ export async function updateSettlement(before: Settlement, patch: Partial<Pick<S
   await logAudit('update', 'settlement', before.id, `Updated settlement ${formatINR(before.amountPaise)} → ${patch.status ?? before.status}`, strip(before as never), patch);
 }
 
+/** Payer: "I've paid" – waits for the receiver or admin to confirm before it counts. */
+export async function reportPayment(input: { fromUid: string; toUid: string; amountPaise: number; reference: string; notes: string; paidDate: string }, byUid: string, receiverAccounts: string[]) {
+  const data = { ...input, status: 'reported' as const, createdBy: byUid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() };
+  const ref = await addDoc(tripCol('settlements'), data);
+  await logAudit('report', 'settlement', ref.id, `Reported payment ${formatINR(input.amountPaise)}`, null, input as never);
+  const targets = receiverAccounts.length ? receiverAccounts : ['admins'];
+  for (const target of targets) {
+    await notify({ type: 'payment_reported', title: 'Payment sent – please confirm', body: `${formatINR(input.amountPaise)} was sent to you. Check your UPI app and tap Confirm.`, link: '/settlements', target });
+  }
+  if (receiverAccounts.length) await notify({ type: 'payment_reported', title: 'Payment reported', body: `${formatINR(input.amountPaise)} reported as paid, waiting for confirmation.`, link: '/settlements', target: 'admins' });
+}
+
+/** Receiver or admin: the money arrived. */
+export async function confirmPayment(s: Settlement, paidDate: string) {
+  await updateDoc(tripDoc('settlements', s.id), { status: 'paid', paidDate: s.paidDate || paidDate, updatedAt: serverTimestamp() });
+  await logAudit('confirm', 'settlement', s.id, `Confirmed payment ${formatINR(s.amountPaise)}`, { status: s.status }, { status: 'paid' });
+  await notify({ type: 'settlement_updated', title: 'Payment confirmed', body: `${formatINR(s.amountPaise)} confirmed as received. Thank you!`, link: '/settlements', target: s.createdBy });
+}
+
 export async function deleteSettlement(s: Settlement) {
   await deleteDoc(tripDoc('settlements', s.id));
   await logAudit('delete', 'settlement', s.id, `Deleted settlement ${formatINR(s.amountPaise)}`, strip(s as never), null);

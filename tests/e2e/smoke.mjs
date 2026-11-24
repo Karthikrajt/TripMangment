@@ -426,6 +426,64 @@ try {
   await admin.getByRole('tab', { name: 'People' }).click();
   await admin.getByRole('heading', { name: 'Sample Family', exact: true }).locator('xpath=../..').getByText('Newcomer Person').waitFor();
   ok('No match → "I\'m not on the list" → added as a new member in the chosen family');
+
+  // UPI pay: receiver adds a UPI ID, payer opens the UPI link and reports "I've paid", receiver confirms.
+  await alice.goto(`${BASE}/profile`);
+  await alice.getByRole('button', { name: /Edit/ }).first().click();
+  await alice.getByLabel('UPI ID (optional)').fill('alice.test@okaxis');
+  await alice.getByRole('button', { name: 'Save' }).click();
+  await alice.getByText('Details saved').waitFor();
+  await admin.goto(`${BASE}/settlements`);
+  const payRow = admin.locator('li', { hasText: 'Alice Kumar' }).filter({ has: admin.getByRole('button', { name: 'Pay', exact: true }) }).first();
+  await payRow.getByRole('button', { name: 'Pay', exact: true }).click();
+  const payDlg = admin.getByRole('dialog', { name: 'Pay Alice Kumar' });
+  const upiLink = payDlg.getByRole('link', { name: /with UPI/ });
+  const href = await upiLink.getAttribute('href');
+  if (!href?.startsWith('upi://pay?pa=alice.test%40okaxis') || !href.includes('cu=INR')) throw new Error(`bad UPI link ${href}`);
+  await shot(admin, 'upi-pay');
+  await payDlg.getByLabel('UPI reference (optional)').fill('123456789012');
+  await payDlg.getByRole('button', { name: /I’ve paid/ }).click();
+  await admin.getByText('Paid – waiting for confirmation').first().waitFor();
+  await alice.goto(`${BASE}/settlements`);
+  await alice.getByRole('button', { name: 'Confirm received' }).first().click();
+  await alice.getByText('Payment confirmed').waitFor();
+  await shot(alice, 'settlement-confirmed-mobile');
+  ok('UPI pay: link carries receiver UPI ID + amount; "I’ve paid" → receiver confirms');
+
+  // Checklist: suggested items, per-person ticks shared with everyone
+  await alice.goto(`${BASE}/checklist`);
+  await alice.getByRole('button', { name: 'Add suggested items' }).click();
+  await alice.getByText('Medicines').waitFor();
+  const meds = alice.locator('li', { hasText: 'Medicines' });
+  await meds.getByRole('button', { name: 'Me', exact: true }).click();
+  await meds.getByRole('button', { name: 'Me', exact: true, pressed: true }).waitFor();
+  await admin.goto(`${BASE}/checklist`);
+  await admin.locator('li', { hasText: 'Medicines' }).getByText(/^1 of \d+ people$/).waitFor();
+  ok('Checklist: suggested items added; a tick on one phone shows on the others');
+
+  // Roll call: admin starts, member taps "I'm here", admin sees them as present
+  await admin.getByRole('button', { name: 'Start', exact: true }).click();
+  await admin.getByRole('dialog', { name: 'Start a roll call' }).getByRole('button', { name: 'Start' }).click();
+  await admin.getByText(/Roll call started/).waitFor();
+  await alice.goto(`${BASE}/checklist`);
+  await alice.getByRole('button', { name: 'I’m here' }).click();
+  await alice.getByRole('button', { name: /You’re marked here/ }).waitFor();
+  await admin.getByRole('button', { name: /Alice Kumar is here/ }).waitFor();
+  await shot(alice, 'rollcall-mobile');
+  await shot(admin, 'checklist-admin');
+  const share = admin.getByRole('link', { name: 'Share missing list' }).first();
+  if (!(await share.getAttribute('href'))?.startsWith('https://wa.me/')) throw new Error('WhatsApp share link missing');
+  ok('Roll call: "I’m here" from a phone shows instantly; missing list can be shared on WhatsApp');
+
+  // WhatsApp share buttons on the plan, tickets and Trip Live
+  await alice.goto(`${BASE}/itinerary`);
+  await alice.getByRole('link', { name: 'Share' }).first().waitFor();
+  await alice.goto(`${BASE}/live`);
+  await alice.getByRole('link', { name: 'Share today' }).waitFor();
+  await alice.goto(`${BASE}/tickets`);
+  await alice.locator('[aria-expanded]').first().click();
+  await alice.getByRole('link', { name: 'Share details' }).first().waitFor();
+  ok('WhatsApp share on itinerary days, tickets and Trip Live');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

@@ -1,3 +1,4 @@
+import { normaliseUpiId } from '../domain/upi';
 import { deleteDoc, doc, serverTimestamp, setDoc, updateDoc, writeBatch, type DocumentData } from 'firebase/firestore';
 import type { User } from 'firebase/auth';
 import { db, tripPath } from '../lib/firebase';
@@ -77,6 +78,8 @@ export async function setMemberRole(m: Member, role: Role) {
 
 export type ProfileInput = Pick<Member, 'displayName' | 'phone' | 'emergencyContact' | 'relationship'> & {
   email?: string;
+  /** UPI ID for receiving settlement payments ('' = none) */
+  upiId?: string;
   ageGroup?: AgeGroup;
   /** true = use shareWeight instead of the trip default (children / infants only) */
   customShare?: boolean;
@@ -118,6 +121,7 @@ export async function addPerson(input: ProfileInput): Promise<string> {
     hasLogin: false,
     personId: '',
     linkedUid: '',
+    upiId: normaliseUpiId(input.upiId ?? '').slice(0, 100),
   };
   await setDoc(ref(id), data);
   await logAudit('create', 'member', id, `Added traveller ${data.displayName} (${ageGroup}${data.customShare ? ` ${data.shareWeight}%` : ''}${data.relationship ? `, ${data.relationship}` : ''})`, null, data as never);
@@ -132,6 +136,7 @@ export async function updateMemberProfile(m: Member, input: ProfileInput, asAdmi
     relationship: input.relationship.trim().slice(0, 100),
     updatedAt: serverTimestamp(),
   };
+  if (input.upiId !== undefined) data.upiId = normaliseUpiId(input.upiId).slice(0, 100);
   if (asAdmin && input.ageGroup) Object.assign(data, shareFields(input.ageGroup, input.customShare, input.shareWeight));
   if (asAdmin && m.hasLogin === false && input.email !== undefined) data.email = input.email.trim().toLowerCase().slice(0, 200);
   await updateDoc(ref(m.uid), data);

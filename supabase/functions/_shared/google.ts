@@ -17,11 +17,16 @@ let cached: { token: string; exp: number } | null = null;
 export function serviceAccount(): ServiceAccount | null {
   const raw = Deno.env.get('FCM_SERVICE_ACCOUNT');
   if (!raw) return null;
-  try {
-    return JSON.parse(raw) as ServiceAccount;
-  } catch {
-    return null;
+  // Plain JSON, or base64-encoded JSON (what the deploy workflow stores).
+  for (const text of [raw, () => atob(raw.trim())]) {
+    try {
+      const sa = JSON.parse(typeof text === 'string' ? text : text()) as ServiceAccount;
+      if (sa?.client_email && sa?.private_key) return sa;
+    } catch {
+      /* try the next format */
+    }
   }
+  return null;
 }
 
 export async function googleAccessToken(sa: ServiceAccount): Promise<string> {

@@ -14,7 +14,8 @@
     "icons": "node scripts/gen-icons.mjs",
     "test:e2e": "node tests/e2e/smoke.mjs",
     "emulators": "firebase emulators:start --only auth,firestore --project demo-trip",
-    "check:functions": "cd supabase/functions && npx -y deno@2 check files/index.ts notify/index.ts"
+    "check:functions": "cd supabase/functions && npx -y deno@2 check files/index.ts notify/index.ts",
+    "test:reminders": "firebase emulators:exec --only firestore --project demo-trip \"cd scripts/reminders && npx tsx test-emulator.ts\""
   },
   "dependencies": {
     "@fontsource-variable/plus-jakarta-sans": "5.2.5",

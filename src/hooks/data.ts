@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useLiveQuery, asType } from './useLive';
 import { tripCol } from '../services/base';
 import { useSession } from '../store/session';
-import type { Accommodation, Announcement, AuditLog, Expense, ItineraryItem, Room, Settlement, Ticket, Vehicle, Vendor } from '../domain/types';
+import type { Accommodation, Announcement, AuditLog, ChecklistItem, Expense, ItineraryItem, RollCall, Room, Settlement, Ticket, Vehicle, Vendor } from '../domain/types';
 import { isAdmin } from '../domain/permissions';
 
 const useApproved = () => useSession((s) => s.member?.status === 'approved');
@@ -48,3 +48,8 @@ export function useAuditLogs(max: number) {
   const admin = useSession((s) => isAdmin(s.member));
   return useLiveQuery<AuditLog>(admin ? `audit:${max}` : null, () => query(tripCol('auditLogs'), orderBy('createdAt', 'desc'), limit(max)), asType<AuditLog>);
 }
+
+const byChecklist = (a: ChecklistItem, b: ChecklistItem) => (a.createdAt?.toMillis?.() ?? Infinity) - (b.createdAt?.toMillis?.() ?? Infinity);
+const byRollCall = (a: RollCall, b: RollCall) => (b.createdAt?.toMillis?.() ?? Infinity) - (a.createdAt?.toMillis?.() ?? Infinity);
+export const useChecklist = () => useCol<ChecklistItem>('checklist', byChecklist);
+export const useRollCalls = () => useCol<RollCall>('rollcalls', byRollCall);
