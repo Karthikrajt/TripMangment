@@ -23,6 +23,10 @@ Goal: **₹0/month**. A family trip of 10–60 people fits well inside free tier
 - Admin "Check usage" (Trip Reports) uses count aggregations (about 1 read per 1,000 documents) and is run on demand only.
 - Supabase JS is lazy-loaded only when uploading.
 
+## Offline cache cost
+
+To make every page work offline, each phone reads all trip collections once in the background, at most every 6 hours (or when the user changes settings). For a trip with about 300 records and 20 phones that is at most ~24,000 reads/day in the worst case, usually far less – under the 50,000/day free limit. Ticket files are downloaded once per device and only again if a ticket's document is replaced.
+
 ## Monitoring
 
 1. **Trip Reports → Free-tier usage & quota** shows document counts, estimated Firestore storage and actual Supabase storage, and warns at 80%.

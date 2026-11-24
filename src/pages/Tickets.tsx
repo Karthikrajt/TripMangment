@@ -76,7 +76,10 @@ export default function Tickets() {
   const filtering = hasActiveFilters(filters);
 
   useEffect(() => {
-    listOffline().then((l) => setOfflineIds(new Set(l.map((x) => x.id)))).catch(() => undefined);
+    const load = () => listOffline().then((l) => setOfflineIds(new Set(l.map((x) => x.id)))).catch(() => undefined);
+    load();
+    window.addEventListener('tm:offline-files', load);
+    return () => window.removeEventListener('tm:offline-files', load);
   }, []);
   // ?open=<id>: expand Completed if needed, then scroll to the ticket.
   useEffect(() => {

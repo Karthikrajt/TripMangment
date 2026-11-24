@@ -66,7 +66,7 @@ export default function Expenses() {
         syncKey="expenses"
         actions={<ButtonLink to="/expenses/new" icon={<Plus className="size-5" />}>Add expense</ButtonLink>}
       />
-      {syncing && <div className="mb-4 flex items-center gap-2 rounded-xl bg-sky-50 px-4 py-2 text-sm text-sky-900"><CloudUpload className="size-4" /> Some expenses are saved on this device and will sync when you are online.</div>}
+      {syncing && <div className="mb-4 flex items-center gap-2 rounded-xl bg-sky-50 px-4 py-2 text-sm text-sky-900"><CloudUpload className="size-4" /> Some expenses are saved on this phone and will sync automatically when you are online.</div>}
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Total approved" value={formatINR(total)} />

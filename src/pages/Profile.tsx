@@ -18,6 +18,8 @@ import { clearSyncState } from '../lib/sync';
 import { formatBytes } from '../lib/format';
 import { errorMessage } from '../lib/retry';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
+import { autoOfflineTickets, setAutoOfflineTickets, syncTicketFiles } from '../lib/offlineSync';
+import { useTickets } from '../hooks/data';
 import { useWhoAreYou } from '../components/WhoAreYou';
 
 export default function Profile() {
@@ -27,6 +29,9 @@ export default function Profile() {
   const [pushOn, setPushOn] = useState(pushEnabledLocally());
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState<OfflineFile[]>([]);
+  const [autoTickets, setAutoTickets] = useState(autoOfflineTickets());
+  const [syncing, setSyncing] = useState(false);
+  const tickets = useTickets();
   const install = useInstallPrompt();
   const openWho = useWhoAreYou((s) => s.open);
   const members = useSession((s) => s.members);
@@ -36,6 +41,19 @@ export default function Profile() {
     pushSupported().then(setPushOk);
     listOffline().then(setOffline).catch(() => undefined);
   }, []);
+
+  async function downloadAll() {
+    setSyncing(true);
+    try {
+      const r = await syncTicketFiles(tickets.data);
+      setOffline(await listOffline());
+      toast.success(r.failed ? `Saved ${r.downloaded} ticket(s); ${r.failed} could not be downloaded` : r.downloaded ? `Saved ${r.downloaded} ticket(s) on this phone` : 'All tickets are already on this phone');
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   if (!member) return null;
 
@@ -125,8 +143,19 @@ export default function Profile() {
               window.location.reload();
             }}
           />
+          <Checkbox
+            label="Keep tickets on this phone for offline use"
+            description="All ticket PDFs and photos are downloaded and kept up to date, so they open without internet. Trip details (itinerary, hotel, transport, expenses) are always saved for offline use."
+            checked={autoTickets}
+            onChange={async (v) => {
+              setAutoOfflineTickets(v);
+              setAutoTickets(v);
+              if (v) await downloadAll();
+            }}
+          />
           <div>
-            <p className="mb-2 flex items-center gap-2 font-medium"><HardDrive className="size-4" /> Tickets saved for offline use ({offline.length})</p>
+            <p className="mb-2 flex items-center gap-2 font-medium"><HardDrive className="size-4" /> Tickets saved on this phone ({offline.length} of {tickets.data.length})</p>
+            {autoTickets && <Button size="sm" variant="secondary" className="mb-2" loading={syncing} onClick={downloadAll}>Update offline tickets now</Button>}
             {offline.length === 0 ? (
               <p className="text-sm text-slate-500">None. Use “Save for offline” on a ticket to keep a copy on this device.</p>
             ) : (
