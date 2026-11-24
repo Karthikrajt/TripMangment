@@ -10,6 +10,16 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { Download, Loader2, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { fetchFileBlob } from '../lib/files';
+import { listOffline } from '../lib/offlineFiles';
+
+/** Use the copy saved on the phone when there is one (fast, works offline). */
+async function offlineBlobFor(path: string): Promise<Blob | null> {
+  try {
+    return (await listOffline()).find((f) => f.path === path)?.blob ?? null;
+  } catch {
+    return null;
+  }
+}
 import { errorMessage } from '../lib/retry';
 
 type Source = { kind: 'path'; path: string; fileName: string; fileType?: string } | { kind: 'blob'; blob: Blob; fileName: string };
@@ -80,7 +90,7 @@ export function DocViewerHost() {
     setError(null);
     setZoom(1);
     setBusy(true);
-    (source.kind === 'blob' ? Promise.resolve(source.blob) : fetchFileBlob(source.path))
+    (source.kind === 'blob' ? Promise.resolve(source.blob) : offlineBlobFor(source.path).then((b) => b ?? fetchFileBlob(source.path)))
       .then((b) => {
         if (!alive) return;
         // Some storage responses come back as octet-stream; trust the known type.

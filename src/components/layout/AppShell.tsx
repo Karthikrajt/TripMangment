@@ -1,4 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { flushQueuedWrites, hasQueuedWrites, onQueueChange } from '../../lib/offlineQueue';
+import { warmOfflineCache } from '../../lib/offlineSync';
+import { toast } from '../ui/Toast';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import { Menu, WifiOff, LogOut, Bell, Plane } from 'lucide-react';
 import { adminNav, bottomNav, memberNav, type NavItem } from './nav';
@@ -66,6 +69,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   const online = useOnline();
   const badges = useBadges();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [queued, setQueued] = useState(hasQueuedWrites());
+  useEffect(() => {
+    const off = onQueueChange(() => setQueued(hasQueuedWrites()));
+    return () => {
+      off();
+    };
+  }, []);
+  // Back online (or reopened with unsent changes): send queued writes, then refresh offline data.
+  useEffect(() => {
+    const sync = () => {
+      if (!navigator.onLine) return;
+      flushQueuedWrites()
+        .then((had) => had && toast.success('All offline changes synced'))
+        .catch(() => undefined);
+      void warmOfflineCache();
+    };
+    sync();
+    window.addEventListener('online', sync);
+    return () => window.removeEventListener('online', sync);
+  }, []);
   const isActive = useIsActive();
 
   return (
@@ -115,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {!online && (
         <div className="sticky top-[58px] lg:top-0 z-20 flex items-center justify-center gap-2 bg-amber-100 px-4 py-2 text-sm font-medium text-amber-900" role="status">
-          <WifiOff className="size-4" /> You are offline – showing saved data. New expenses will sync automatically.
+          <WifiOff className="size-4" /> Offline – showing saved data.{queued ? ' Your changes are saved on this phone and will sync automatically.' : ' Expenses and messages you add will sync automatically.'}
         </div>
       )}
 

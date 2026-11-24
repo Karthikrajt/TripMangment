@@ -6,6 +6,7 @@
 |---|---|---|
 | Unit | `npm test` | Rupee↔paise parsing, equal/selected/custom/trip-wide splits, exact-sum validation, settlement (including the spec example), transfer minimisation, IST date/time formatting, file type/size/MIME/path validation, CSV escaping |
 | Security rules | `npm run test:rules` | 39 direct-API cases (including travellers without login and account linking): unauthenticated and pending lockout, self-only access requests, no self-approval, bootstrap admin, admin-only content, ticket create/read for all, no cross-member ticket edit/delete, locks, admin manages all tickets, expense ownership/status/amount rules, no member approvals, idempotent expense ids, chat impersonation, notification query restrictions |
+| Offline (production build + service worker) | see `tests/e2e/offline.mjs` header | Pages never opened before work offline; expense added offline is kept on the phone and syncs automatically when back online; app reopens with no internet |
 | UI smoke | `npm run emulators`, then `npm run dev`, then `npm run test:e2e` | Setup → request → approve (real time) → itinerary → admin-page guard → expense → verification → settlement → chat → every page renders → audit entry → pending user gets 403 from the REST API |
 | Edge Functions | `npm run check:functions` | Deno type-check |
 
@@ -51,6 +52,7 @@
 - [ ] Admin approves it, and totals and settlement update
 - [ ] Admin rejects with a note, and the submitter is notified
 - [ ] The member edits their own pending expense, but cannot edit an approved one
+- [ ] Turn on airplane mode after opening the app once online: tickets (with passenger berths), itinerary, hotel, transport, Hotels & Travel and expenses all open; ticket PDFs/photos open from the phone (Profile → "Keep tickets on this phone")
 - [ ] Offline: add an expense, see "Saved on this device", go online, and exactly one record exists
 - [ ] Double-tapping Submit creates one record
 

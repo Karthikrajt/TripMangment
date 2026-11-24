@@ -137,7 +137,11 @@ onAuthStateChanged(auth, (user) => {
         const key = member ? `${member.status}:${member.role}` : '';
         if (key === lastApprovalKey) return;
         lastApprovalKey = key;
-        if (member?.status === 'approved') startApprovedListeners(member);
+        if (member?.status === 'approved') {
+          startApprovedListeners(member);
+          // Save all trip details (and ticket files) on the phone for offline use.
+          void import('../lib/offlineSync').then(({ warmOfflineCache }) => warmOfflineCache());
+        }
         else {
           stopAll(approvedUnsubs);
           s({ trip: null, members: [], notifications: [], messages: [] });

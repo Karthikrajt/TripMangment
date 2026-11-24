@@ -7,6 +7,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db, tripPath, tripId, auth } from '../lib/firebase';
+import { noteQueuedWrite } from '../lib/offlineQueue';
 import { env } from '../config/env';
 import type { NotificationTarget, NotificationType } from '../domain/types';
 
@@ -47,7 +48,7 @@ export async function logAudit(
   const u = auth.currentUser;
   if (!u) return;
   try {
-    await addDoc(tripCol('auditLogs'), {
+    const write = addDoc(tripCol('auditLogs'), {
       action,
       entity,
       entityId,
@@ -58,6 +59,13 @@ export async function logAudit(
       after: auditSafe(after),
       createdAt: serverTimestamp(),
     });
+    // Offline: the write is queued on the device and sent later; don't wait for it.
+    if (!navigator.onLine) {
+      noteQueuedWrite();
+      write.catch((e) => console.warn('audit log failed', e));
+      return;
+    }
+    await write;
   } catch (e) {
     console.warn('audit log failed', e);
   }
@@ -71,7 +79,7 @@ export async function notify(n: { type: NotificationType; title: string; body: s
   const u = auth.currentUser;
   if (!u) return;
   try {
-    const ref = await addDoc(tripCol('notifications'), {
+    const pending = addDoc(tripCol('notifications'), {
       type: n.type,
       title: n.title.slice(0, 150),
       body: n.body.slice(0, 500),
@@ -80,7 +88,15 @@ export async function notify(n: { type: NotificationType; title: string; body: s
       createdBy: u.uid,
       createdAt: serverTimestamp(),
     });
-    if (!env.supabaseUrl || !navigator.onLine) return;
+    // Offline: the in-app notification is queued and appears once synced;
+    // push is best-effort and skipped.
+    if (!navigator.onLine) {
+      noteQueuedWrite();
+      pending.catch((e) => console.warn('notification failed', e));
+      return;
+    }
+    const ref = await pending;
+    if (!env.supabaseUrl) return;
     const token = await u.getIdToken();
     fetch(`${env.supabaseUrl}/functions/v1/notify`, {
       method: 'POST',

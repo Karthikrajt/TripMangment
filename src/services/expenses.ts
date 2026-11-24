@@ -1,6 +1,7 @@
 import { deleteDoc, getDoc, serverTimestamp, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 import { tripCol, tripDoc, logAudit, notify, strip } from './base';
 import { deleteFile } from '../lib/files';
+import { writeOrQueue } from '../lib/offlineQueue';
 import { formatINR } from '../domain/money';
 import { isSplitConsistent } from '../domain/split';
 import type { Expense, ExpenseStatus, Settlement } from '../domain/types';
@@ -17,10 +18,10 @@ export type ExpenseInput = Pick<
  * The local write is applied immediately (works offline); the returned
  * promise resolves when the server has acknowledged it.
  */
-export function submitExpense(idempotencyKey: string, input: ExpenseInput, by: { uid: string; name: string }): Promise<void> {
+export async function submitExpense(idempotencyKey: string, input: ExpenseInput, by: { uid: string; name: string }): Promise<'saved' | 'queued'> {
   if (!isSplitConsistent(input.amountPaise, input.splits)) throw new Error('Split amounts must add up exactly to the total.');
   const ref = tripDoc('expenses', idempotencyKey);
-  return setDoc(ref, {
+  const result = await writeOrQueue(setDoc(ref, {
     ...input,
     status: 'pending',
     reviewNote: '',
@@ -29,17 +30,19 @@ export function submitExpense(idempotencyKey: string, input: ExpenseInput, by: {
     createdBy: by.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  }).then(async () => {
-    await logAudit('create', 'expense', idempotencyKey, `Submitted expense “${input.title}” ${formatINR(input.amountPaise)}`, null, input as never);
-    await notify({ type: 'expense_submitted', title: 'Expense awaiting approval', body: `${by.name}: ${input.title} – ${formatINR(input.amountPaise)}`, link: '/expenses?tab=review', target: 'admins' });
-  });
+  }));
+  // Audit and in-app notification are queued too when offline.
+  await logAudit('create', 'expense', idempotencyKey, `Submitted expense “${input.title}” ${formatINR(input.amountPaise)}`, null, input as never);
+  await notify({ type: 'expense_submitted', title: 'Expense awaiting approval', body: `${by.name}: ${input.title} – ${formatINR(input.amountPaise)}`, link: '/expenses?tab=review', target: 'admins' });
+  return result;
 }
 
-export async function updateExpense(before: Expense, input: ExpenseInput) {
+export async function updateExpense(before: Expense, input: ExpenseInput): Promise<'saved' | 'queued'> {
   if (!isSplitConsistent(input.amountPaise, input.splits)) throw new Error('Split amounts must add up exactly to the total.');
-  await updateDoc(tripDoc('expenses', before.id), { ...input, updatedAt: serverTimestamp() });
-  if (before.receiptPath && before.receiptPath !== input.receiptPath) await deleteFile(before.receiptPath).catch(() => undefined);
+  const result = await writeOrQueue(updateDoc(tripDoc('expenses', before.id), { ...input, updatedAt: serverTimestamp() }));
+  if (result === 'saved' && before.receiptPath && before.receiptPath !== input.receiptPath) await deleteFile(before.receiptPath).catch(() => undefined);
   await logAudit('update', 'expense', before.id, `Edited expense “${input.title}”`, strip(before as never), input as never);
+  return result;
 }
 
 export async function reviewExpense(e: Expense, status: ExpenseStatus, adminUid: string, note: string) {

@@ -114,19 +114,11 @@ function ExpenseForm({ existing }: { existing: Expense | null }) {
         splitMethod: v.splitMethod,
         splits: preview.splits,
       };
-      if (existing) {
-        await updateExpense(existing, input);
-        toast.success('Expense updated');
-      } else {
-        const committed = submitExpense(idempotencyKey.current, input, { uid: me.uid, name: me.displayName });
-        if (navigator.onLine) {
-          await committed;
-          toast.success('Expense submitted for admin approval');
-        } else {
-          committed.catch((err) => toast.error(`An offline expense failed to sync: ${errorMessage(err)}`));
-          toast.info('Saved on this device. It will be submitted automatically when you are back online.');
-        }
-      }
+      const result = existing
+        ? await updateExpense(existing, input)
+        : await submitExpense(idempotencyKey.current, input, { uid: me.uid, name: me.displayName });
+      if (result === 'queued') toast.info('Saved on this phone. It will sync automatically when you are back online.');
+      else toast.success(existing ? 'Expense updated' : 'Expense submitted for admin approval');
       nav('/expenses');
     } catch (err) {
       if (uploaded) await deleteFile(uploaded.path).catch(() => undefined);
