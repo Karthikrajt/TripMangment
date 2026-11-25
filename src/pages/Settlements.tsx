@@ -1,6 +1,9 @@
 import { familyOf, personIdOf, peopleOf } from '../domain/people';
 import { useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Scale, Trash2, AlertTriangle, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Scale, Trash2, AlertTriangle, Users, Copy, Hourglass, IndianRupee, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { upiPayUrl } from '../domain/upi';
+import type { Member } from '../domain/types';
 import { useExpenses, useSettlements } from '../hooks/data';
 import { useIsAdmin, useSession, memberName } from '../store/session';
 import { PageHeader } from '../components/ui/PageHeader';
@@ -14,7 +17,7 @@ import { confirm } from '../components/ui/Confirm';
 import { toast } from '../components/ui/Toast';
 import { computeSettlement, familyBalances, type Transfer } from '../domain/settlement';
 import { formatINR, paiseToInput, rupeesToPaise } from '../domain/money';
-import { deleteSettlement, recordSettlement, updateSettlement } from '../services/expenses';
+import { confirmPayment, deleteSettlement, recordSettlement, reportPayment, updateSettlement } from '../services/expenses';
 import { formatDate, todayIST } from '../lib/format';
 import { errorMessage } from '../lib/retry';
 import type { Settlement } from '../domain/types';
@@ -26,6 +29,7 @@ export default function Settlements() {
   const me = useSession((s) => s.member);
   const admin = useIsAdmin();
   const [recording, setRecording] = useState<Transfer | null>(null);
+  const [paying, setPaying] = useState<Transfer | null>(null);
 
   const memberUids = useMemo(() => peopleOf(members).map((m) => m.uid), [members]);
   const myId = personIdOf(me);
@@ -37,6 +41,21 @@ export default function Settlements() {
   }, [summary.balances, members]);
 
   if (expenses.loading || settlements.loading) return <Spinner />;
+
+  const myFamily = me ? familyOf(members.find((m) => m.uid === myId) ?? me) : '';
+  const canPayFor = (uid: string) => uid === myId || (!!myFamily && familyOf(members.find((m) => m.uid === uid) ?? ({ relationship: '' } as Member)) === myFamily);
+  const reportedFor = (t: Transfer) => settlements.data.find((s) => s.status === 'reported' && s.fromUid === t.fromUid && s.toUid === t.toUid);
+  const myUpi = upiOf(myId, members);
+  const owedToMe = (mine?.outstanding ?? 0) > 0;
+
+  const confirmReceived = async (s: Settlement) => {
+    try {
+      await confirmPayment(s, todayIST());
+      toast.success('Payment confirmed');
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
 
   const markOpenPaid = async (s: Settlement) => {
     try {
@@ -75,6 +94,12 @@ export default function Settlements() {
         />
       </div>
 
+      {owedToMe && !myUpi && (
+        <Notice tone="info">
+          <IndianRupee className="mr-1 inline size-4" /> Add your UPI ID so people can pay you in one tap. <Link to="/profile" className="font-semibold text-brand-700 underline">Add it in Profile → Edit</Link>
+        </Notice>
+      )}
+
       <Card>
         <CardHeader icon={<ArrowRight className="size-5" />} title="Suggested settlements" subtitle="The fewest payments needed to settle everyone up." />
         <CardBody>
@@ -92,7 +117,16 @@ export default function Settlements() {
                       <b className="truncate">{memberName(members, t.toUid)}</b>
                     </span>
                     <span className="text-lg font-bold tabular-nums">{formatINR(t.amountPaise)}</span>
-                    {admin && <Button size="sm" variant="success" onClick={() => setRecording(t)}>Mark as paid</Button>}
+                    {(() => {
+                      const reported = reportedFor(t);
+                      if (reported) return <Badge tone="amber"><Hourglass className="mr-1 inline size-3.5" />Paid – waiting for confirmation</Badge>;
+                      return (
+                        <span className="flex flex-wrap gap-2">
+                          {canPayFor(t.fromUid) && <Button size="sm" icon={<Send className="size-4" />} onClick={() => setPaying(t)}>Pay</Button>}
+                          {admin && <Button size="sm" variant="success" onClick={() => setRecording(t)}>Mark as paid</Button>}
+                        </span>
+                      );
+                    })()}
                   </li>
                 );
               })}
@@ -160,14 +194,16 @@ export default function Settlements() {
                   <span className="min-w-0 flex-1">
                     <span className="font-semibold">{memberName(members, s.fromUid)} → {memberName(members, s.toUid)}</span>
                     <span className="block text-sm text-slate-500">
-                      {s.status === 'paid' ? `Paid ${formatDate(s.paidDate)}` : 'Not yet paid'}
+                      {s.status === 'paid' ? `Paid ${formatDate(s.paidDate)}` : s.status === 'reported' ? `Sent ${formatDate(s.paidDate)}, not confirmed yet` : 'Not yet paid'}
                       {s.reference && ` · Ref: ${s.reference}`}
                       {s.notes && ` · ${s.notes}`}
                     </span>
                   </span>
                   <span className="font-bold tabular-nums">{formatINR(s.amountPaise)}</span>
-                  <Badge tone={s.status === 'paid' ? 'green' : 'amber'}>{s.status}</Badge>
+                  <Badge tone={s.status === 'paid' ? 'green' : 'amber'}>{s.status === 'reported' ? 'waiting for confirmation' : s.status}</Badge>
                   {admin && s.status === 'open' && <Button size="sm" variant="secondary" onClick={() => markOpenPaid(s)}>Mark paid</Button>}
+                  {s.status === 'reported' && (admin || s.toUid === myId) && <Button size="sm" variant="success" icon={<CheckCircle2 className="size-4" />} onClick={() => confirmReceived(s)}>Confirm received</Button>}
+                  {!admin && s.status === 'reported' && s.createdBy === me?.uid && <Button size="sm" variant="ghost" className="text-red-700" onClick={() => remove(s)}>Cancel</Button>}
                   {admin && <Button size="sm" variant="ghost" className="text-red-700" aria-label="Delete settlement" icon={<Trash2 className="size-4" />} onClick={() => remove(s)} />}
                 </li>
               ))}
@@ -177,6 +213,7 @@ export default function Settlements() {
       </Card>
 
       {recording && <RecordSettlement transfer={recording} onClose={() => setRecording(null)} />}
+      {paying && <PayModal transfer={paying} onClose={() => setPaying(null)} />}
     </div>
   );
 }
@@ -214,6 +251,82 @@ function RecordSettlement({ transfer, onClose }: { transfer: Transfer; onClose: 
         <TextField label="Settlement date" type="date" value={paidDate} onChange={(e) => setPaidDate(e.target.value)} />
         <TextField label="Reference (UPI ref / cash)" maxLength={200} value={reference} onChange={(e) => setReference(e.target.value)} />
         <TextField label="Notes" maxLength={500} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        <FormError message={error} />
+      </div>
+    </Modal>
+  );
+}
+
+/** UPI ID of a traveller: their own, or the one on the sign-in account linked to them. */
+function upiOf(personId: string, members: Member[]): string {
+  const p = members.find((m) => m.uid === personId);
+  return p?.upiId || members.find((m) => m.personId === personId)?.upiId || '';
+}
+
+/** Sign-in accounts that act as this traveller (to notify them). */
+function accountsOf(personId: string, members: Member[]): string[] {
+  return members.filter((m) => m.status === 'approved' && m.hasLogin !== false && (m.uid === personId || m.personId === personId)).map((m) => m.uid);
+}
+
+function PayModal({ transfer, onClose }: { transfer: Transfer; onClose: () => void }) {
+  const me = useSession((s) => s.member)!;
+  const trip = useSession((s) => s.trip);
+  const members = useSession((s) => s.members);
+  const to = memberName(members, transfer.toUid);
+  const upi = upiOf(transfer.toUid, members);
+  const [amount, setAmount] = useState(paiseToInput(transfer.amountPaise));
+  const [reference, setReference] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const paise = rupeesToPaise(amount) ?? 0;
+  const payUrl = upi && paise > 0 ? upiPayUrl({ upiId: upi, name: to, amountPaise: paise, note: `${trip?.name ?? 'Trip'} settlement` }) : '';
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(upi);
+      toast.success('UPI ID copied');
+    } catch {
+      toast.error('Could not copy');
+    }
+  };
+  const report = async () => {
+    if (!paise || paise <= 0) return setError('Enter a valid amount.');
+    setBusy(true);
+    setError(null);
+    try {
+      await reportPayment({ fromUid: transfer.fromUid, toUid: transfer.toUid, amountPaise: paise, reference: reference.trim(), notes: `Reported by ${me.displayName}`.slice(0, 500), paidDate: todayIST() }, me.uid, accountsOf(transfer.toUid, members));
+      toast.success(`Thanks! ${to} will confirm it.`);
+      onClose();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Pay ${to}`} footer={<><Button variant="secondary" onClick={onClose}>Close</Button><Button variant="success" loading={busy} icon={<CheckCircle2 className="size-5" />} onClick={report}>I’ve paid</Button></>}>
+      <div className="space-y-4">
+        <p className="text-lg">
+          {transfer.fromUid !== personIdOf(me) ? <><b>{memberName(members, transfer.fromUid)}</b> pays</> : 'You pay'} <b>{to}</b>
+        </p>
+        <TextField label="Amount (₹)" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        {upi ? (
+          <div className="space-y-2 rounded-2xl bg-brand-50 p-4">
+            <p className="text-sm text-slate-600">UPI ID</p>
+            <p className="flex items-center gap-2 font-mono text-lg font-semibold break-all">{upi}
+              <button type="button" onClick={copy} className="rounded-lg p-1.5 text-brand-700 hover:bg-white" aria-label="Copy UPI ID"><Copy className="size-4" /></button>
+            </p>
+            <a href={payUrl} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-brand-700 px-4 py-3 text-lg font-bold text-white hover:bg-brand-800">
+              <IndianRupee className="size-5" /> Pay {paise > 0 ? formatINR(paise) : ''} with UPI
+            </a>
+            <p className="text-xs text-slate-500">Opens GPay, PhonePe, Paytm or BHIM on your phone with the amount filled in. Come back and tap “I’ve paid”.</p>
+          </div>
+        ) : (
+          <Notice tone="warn">{to} hasn’t added a UPI ID yet. Pay by cash or ask for their UPI ID, then tap “I’ve paid”.</Notice>
+        )}
+        <TextField label="UPI reference (optional)" maxLength={200} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="12-digit UTR from your UPI app" />
+        <p className="text-sm text-slate-500">It counts in the balances once {to} or the trip admin confirms it.</p>
         <FormError message={error} />
       </div>
     </Modal>

@@ -67,6 +67,8 @@ export interface Member {
   linkedUid?: string;
   /** On a sign-in account: the person has answered "which traveller are you?". */
   linkDecided?: boolean;
+  /** UPI ID (VPA) for receiving settlement payments, e.g. name@okicici */
+  upiId?: string;
 }
 
 export interface ItineraryItem {
@@ -228,7 +230,11 @@ export interface Expense {
   updatedAt: TS;
 }
 
-export type SettlementStatus = 'open' | 'paid';
+/**
+ * open = planned, not yet paid; reported = the payer says "I've paid" and is
+ * waiting for the receiver or admin to confirm; paid = confirmed (counts in balances).
+ */
+export type SettlementStatus = 'open' | 'reported' | 'paid';
 export interface Settlement {
   id: string;
   fromUid: string;
@@ -281,7 +287,10 @@ export type NotificationType =
   | 'chat_message'
   | 'announcement'
   | 'settlement_updated'
-  | 'member_joined';
+  | 'member_joined'
+  | 'reminder'
+  | 'roll_call'
+  | 'payment_reported';
 
 export interface AppNotification {
   id: string;
@@ -343,6 +352,36 @@ export interface Vendor {
   /** 0 = not rated, else 1–5 */
   rating: number;
   notes: string;
+  createdBy: string;
+  createdByName: string;
+  createdAt: TS;
+  updatedAt: TS;
+}
+
+/** Shared checklist item (packing, travel day). Ticks are per person or per family. */
+export type ChecklistScope = 'person' | 'family' | 'group';
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  /** person: everyone ticks for themselves; family: one tick per family; group: one tick for the whole trip */
+  scope: ChecklistScope;
+  /** tick key (person id / family name / 'group') → true */
+  done: Record<string, boolean>;
+  createdBy: string;
+  createdByName: string;
+  createdAt: TS;
+  updatedAt: TS;
+}
+
+/** "Who's on board?" – a quick head count before a train, bus or after a stop. */
+export interface RollCall {
+  id: string;
+  title: string;
+  /** people expected; empty = everyone on the trip */
+  personIds: string[];
+  /** person id → true when present */
+  present: Record<string, boolean>;
+  open: boolean;
   createdBy: string;
   createdByName: string;
   createdAt: TS;

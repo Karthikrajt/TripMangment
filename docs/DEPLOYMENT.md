@@ -59,19 +59,27 @@ npx supabase functions deploy files --no-verify-jwt
 npx supabase functions deploy notify --no-verify-jwt
 ```
 
-## 3. Push notifications (optional, best-effort)
+## 3. Push notifications & reminders
 
-In-app notifications work without this step.
+In-app notifications (the bell) work without this step. For notifications on
+the phone when the app is closed:
 
-1. Firebase console → **Project settings → Cloud Messaging → Web Push certificates → Generate key pair**. Put the public key in `VITE_FIREBASE_VAPID_KEY`.
-2. Google Cloud console → IAM → Service accounts. Create a service account with the roles **Firebase Cloud Messaging API Admin** and **Cloud Datastore Viewer**, plus **Cloud Datastore User** so it can prune dead tokens. Create a JSON key.
-3. Store the key only as a Supabase secret, then delete the local file:
+1. Firebase console → **Project settings → Cloud Messaging → Web Push certificates → Generate key pair**. Put the public key in `VITE_FIREBASE_VAPID_KEY` in `.env.production` (it is public, safe to commit).
+2. Google Cloud console → **APIs & Services** → make sure **Firebase Cloud Messaging API** (V1) is enabled.
+3. Nothing else: the Deploy workflow stores the `FIREBASE_SERVICE_ACCOUNT` GitHub secret as the Supabase secret `FCM_SERVICE_ACCOUNT` (used by the `notify` function), and the **Reminders** workflow (`.github/workflows/reminders.yml`) uses the same secret.
 
-```bash
-npx supabase secrets set FCM_SERVICE_ACCOUNT="$(cat service-account.json)"
-```
+Manual setup without GitHub Actions: `npx supabase secrets set FCM_SERVICE_ACCOUNT="$(base64 -w0 service-account.json)"` (plain JSON also works).
 
-4. Make sure the *Firebase Cloud Messaging API (V1)* is enabled for the project.
+**Reminders** (GitHub Actions, every 15 minutes, free on public repos; exits in seconds outside the trip dates):
+
+| When | Who |
+|---|---|
+| 7 PM the evening before a train | that ticket's passengers |
+| 3 hours before departure | that ticket's passengers |
+| 1 hour before a vehicle pickup | people assigned to the vehicle |
+| 7 AM on each trip day | everyone (the day's plan) |
+
+Each reminder is sent once (marker docs in `trips/main/reminders`), shows in the bell and goes to phones that turned notifications on. Run it by hand: Actions → Reminders → Run workflow. GitHub pauses scheduled workflows after 60 days without commits; re-enable it there if needed. Test locally: `cd scripts/reminders && npm ci && cd ../.. && npm run test:reminders`.
 
 On iPhone, web push only works after the user adds the app to the Home Screen (iOS 16.4+).
 

@@ -1,3 +1,5 @@
+import { ShareWhatsApp } from '../components/ShareWhatsApp';
+import { dayPlanText } from '../domain/share';
 import { useMemo, useState } from 'react';
 import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useItinerary } from '../hooks/data';
@@ -20,6 +22,7 @@ import type { ItineraryItem } from '../domain/types';
 
 export default function Itinerary() {
   const { data, loading, error } = useItinerary();
+  const trip = useSession((st) => st.trip);
   const admin = useIsAdmin();
   const [editing, setEditing] = useState<ItineraryItem | 'new' | null>(null);
 
@@ -64,7 +67,8 @@ export default function Itinerary() {
               <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-3">
                 <span className="rounded-xl bg-brand-700 px-3 py-1 font-bold text-white">Day {d.day}</span>
                 <span className="font-semibold text-slate-700">{formatDateLong(d.date)}</span>
-                <span className="text-sm text-slate-400">{formatDate(d.date)}</span>
+                <span className="hidden text-sm text-slate-400 sm:inline">{formatDate(d.date)}</span>
+                <ShareWhatsApp size="sm" className="ml-auto" label="Share" text={() => dayPlanText(trip?.name ?? 'Trip', d.date, d.items)} />
               </div>
               <CardBody>
                 <ul className="space-y-1">

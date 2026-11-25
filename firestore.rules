@@ -94,12 +94,12 @@ service cloud.firestore {
       // ---------- members & access requests ---------------------------------
       match /members/{memberId} {
         function isSelf() { return signedIn() && uid() == memberId; }
-        function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'linkDecided', 'updatedAt']; }
+        function profileKeys() { return ['displayName', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'linkDecided', 'upiId', 'updatedAt']; }
         // Trip setting: anyone who signs in joins without admin approval (default on).
         function openJoin() { return exists(tripPath(tripId)) && trip(tripId).get('openJoin', true) == true; }
         function travellerPath(id) { return memberPath(tripId, id); }
         function validMember(d) {
-          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'customShare', 'hasLogin', 'personId', 'linkedUid', 'linkDecided'])
+          return d.keys().hasOnly(['uid', 'displayName', 'email', 'photoURL', 'phone', 'emergencyContact', 'relationship', 'role', 'status', 'requestNote', 'requestedAt', 'decidedAt', 'decidedBy', 'updatedAt', 'ageGroup', 'shareWeight', 'customShare', 'hasLogin', 'personId', 'linkedUid', 'linkDecided', 'upiId'])
             && d.uid == memberId
             && str(d.displayName, 100) && str(d.email, 200) && str(d.photoURL, 1000)
             && str(d.phone, 30) && str(d.emergencyContact, 200) && str(d.relationship, 100)
@@ -112,7 +112,8 @@ service cloud.firestore {
             && (!('hasLogin' in d) || d.hasLogin is bool)
             && (!('personId' in d) || str(d.personId, 128))
             && (!('linkedUid' in d) || str(d.linkedUid, 128))
-            && (!('linkDecided' in d) || d.linkDecided is bool);
+            && (!('linkDecided' in d) || d.linkDecided is bool)
+            && optStr(d, 'upiId', 100);
         }
         // Fields only an admin may set on a sign-in account.
         function noAdminFields(d) {
@@ -297,15 +298,87 @@ service cloud.firestore {
           || (isApproved(tripId) && existing().createdBy == uid() && existing().status == 'pending');
       }
 
-      // Settlement records are separate from expenses; admin-managed.
+      // Settlement records are separate from expenses. Admin manages them; a
+      // payer may report "I've paid" (status 'reported') for themselves or
+      // someone in their family; the receiver or an admin confirms it.
       match /settlements/{settlementId} {
+        function validSettlement(d) {
+          return d.keys().hasOnly(['fromUid', 'toUid', 'amountPaise', 'status', 'paidDate', 'reference', 'notes', 'createdBy', 'createdAt', 'updatedAt'])
+            && d.amountPaise is int && d.amountPaise > 0 && d.amountPaise <= 1000000000
+            && d.fromUid is string && d.toUid is string && d.fromUid != d.toUid
+            && d.status in ['open', 'reported', 'paid'] && isDate(d.paidDate)
+            && str(d.reference, 200) && str(d.notes, 500);
+        }
+        // The traveller this account acts as (itself, or the linked traveller).
+        function myPerson() { return myMember(tripId).get('personId', '') != '' ? myMember(tripId).personId : uid(); }
+        function familyOf(personId) { return get(memberPath(tripId, personId)).data.get('relationship', ''); }
+        function mayPayFor(personId) {
+          return personId == myPerson()
+            || (exists(memberPath(tripId, personId)) && familyOf(myPerson()) != '' && familyOf(personId) == familyOf(myPerson()));
+        }
+
         allow read: if isApproved(tripId);
-        allow create, update: if isAdmin(tripId)
-          && incoming().amountPaise is int && incoming().amountPaise > 0
-          && incoming().fromUid is string && incoming().toUid is string && incoming().fromUid != incoming().toUid
-          && incoming().status in ['open', 'paid'] && isDate(incoming().paidDate)
-          && str(incoming().reference, 200) && str(incoming().notes, 500);
-        allow delete: if isAdmin(tripId);
+        allow create: if validSettlement(incoming()) && (
+          isAdmin(tripId)
+          || (isApproved(tripId) && incoming().status == 'reported'
+              && incoming().createdBy == uid() && incoming().createdAt == request.time
+              && exists(memberPath(tripId, incoming().toUid))
+              && mayPayFor(incoming().fromUid))
+        );
+        allow update: if validSettlement(incoming()) && (
+          isAdmin(tripId)
+          // Receiver confirms money arrived.
+          || (isApproved(tripId) && existing().status == 'reported' && incoming().status == 'paid'
+              && existing().toUid == myPerson()
+              && changed().hasOnly(['status', 'paidDate', 'updatedAt']))
+        );
+        allow delete: if isAdmin(tripId)
+          || (isApproved(tripId) && existing().status == 'reported' && existing().createdBy == uid());
+      }
+
+      // ---------- travel-day checklist (shared ticks) ------------------------------
+      // Any approved member adds items and ticks them (for themselves, their
+      // family or the group). The person who added an item or an admin edits/deletes it.
+      match /checklist/{itemId} {
+        function validItem(d) {
+          return d.keys().hasOnly(['title', 'scope', 'done', 'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+            && str(d.title, 150) && d.title.size() > 0
+            && d.scope in ['person', 'family', 'group']
+            && d.done is map && d.done.size() <= 300
+            && str(d.createdByName, 100);
+        }
+        allow read: if isApproved(tripId);
+        allow create: if isApproved(tripId) && validItem(incoming())
+          && incoming().createdBy == uid() && incoming().createdAt == request.time;
+        allow update: if isApproved(tripId) && validItem(incoming())
+          && unchanged(['createdBy', 'createdByName', 'createdAt'])
+          && (isAdmin(tripId) || existing().createdBy == uid() || changed().hasOnly(['done', 'updatedAt']));
+        allow delete: if isAdmin(tripId) || (isApproved(tripId) && existing().createdBy == uid());
+      }
+
+      // ---------- "Who's on board?" roll calls --------------------------------------
+      match /rollcalls/{rollId} {
+        function validRoll(d) {
+          return d.keys().hasOnly(['title', 'personIds', 'present', 'open', 'createdBy', 'createdByName', 'createdAt', 'updatedAt'])
+            && str(d.title, 150) && d.title.size() > 0
+            && strList(d.personIds, 300)
+            && d.present is map && d.present.size() <= 300
+            && d.open is bool && str(d.createdByName, 100);
+        }
+        allow read: if isApproved(tripId);
+        allow create: if isApproved(tripId) && validRoll(incoming())
+          && incoming().createdBy == uid() && incoming().createdAt == request.time
+          && incoming().open == true;
+        allow update: if isApproved(tripId) && validRoll(incoming())
+          && unchanged(['createdBy', 'createdByName', 'createdAt'])
+          && (isAdmin(tripId) || existing().createdBy == uid()
+              || (existing().open == true && changed().hasOnly(['present', 'updatedAt'])));
+        allow delete: if isAdmin(tripId) || (isApproved(tripId) && existing().createdBy == uid());
+      }
+
+      // Reminder markers – written only by the scheduled reminders job (service account).
+      match /reminders/{key} {
+        allow read, write: if false;
       }
 
       // ---------- hotels, resorts & travel contacts (enquiry register) -----------

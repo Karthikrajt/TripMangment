@@ -1,3 +1,4 @@
+import { refreshPush } from '../../lib/push';
 import { useEffect, useState, type ReactNode } from 'react';
 import { flushQueuedWrites, hasQueuedWrites, onQueueChange } from '../../lib/offlineQueue';
 import { warmOfflineCache } from '../../lib/offlineSync';
@@ -89,6 +90,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.addEventListener('online', sync);
     return () => window.removeEventListener('online', sync);
   }, []);
+  // Keep this phone's push token fresh so reminders keep arriving.
+  const myUid = member?.uid;
+  useEffect(() => {
+    if (myUid && navigator.onLine) void refreshPush(myUid);
+  }, [myUid]);
   const isActive = useIsActive();
 
   return (

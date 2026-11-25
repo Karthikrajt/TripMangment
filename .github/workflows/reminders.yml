@@ -1,0 +1,42 @@
+# Trip reminders: train (evening before + 3 h before), pickup (1 h before) and
+# the morning plan. Runs every 15 minutes; outside the trip dates it exits in
+# seconds. Each reminder is sent once (marker docs in Firestore).
+#
+# Uses the same secret as Deploy (FIREBASE_SERVICE_ACCOUNT) and the
+# DEPLOY_ENABLED variable. Free on public repositories.
+# Note: GitHub pauses scheduled workflows after 60 days without commits –
+# re-enable it under Actions → Reminders if that happens.
+name: Reminders
+on:
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: reminders
+  cancel-in-progress: false
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_ENABLED == 'true' }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/reminders
+            src/domain
+            .env.production
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scripts/reminders/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: scripts/reminders
+      - name: Send due reminders
+        working-directory: scripts/reminders
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          P="$(grep -E '^VITE_FIREBASE_PROJECT_ID=' ../../.env.production | cut -d= -f2)"
+          APP_URL="https://$P.web.app" npx tsx send.ts

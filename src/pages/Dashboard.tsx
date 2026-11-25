@@ -1,3 +1,4 @@
+import { PushPrompt } from '../components/PushPrompt';
 import { personIdOf, peopleOf, headCount, ageSummary } from '../domain/people';
 import { CalendarDays, Hotel, Bus, Receipt, MessagesSquare, Ticket, Megaphone, Activity, Users, Train, UserCheck, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -72,6 +73,8 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
+
+      <PushPrompt />
 
       {/* Quick access */}
       <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
