@@ -1,3 +1,4 @@
+import { CallButtons } from '../components/CallButtons';
 import { useEffect, useRef, useState } from 'react';
 import { Paperclip, Send, Trash2, FileText, Megaphone, ImageIcon, X } from 'lucide-react';
 import { useSession, useIsAdmin } from '../store/session';
@@ -92,9 +93,12 @@ export default function Chat() {
   let lastDay = '';
   return (
     <div className="-mx-4 -mt-5 flex h-[calc(100dvh-8.5rem)] flex-col sm:-mx-6 lg:mx-0 lg:mt-0 lg:h-[calc(100dvh-4rem)] lg:rounded-2xl lg:border lg:border-slate-200 lg:bg-white">
-      <div className="border-b border-slate-200 bg-white px-4 py-3 lg:rounded-t-2xl">
-        <h1 className="text-xl font-bold">Group Chat</h1>
-        <p className="text-sm text-slate-500">Everyone on the trip can see these messages.</p>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-3 lg:rounded-t-2xl">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold">Group Chat</h1>
+          <p className="text-sm text-slate-500">Everyone on the trip can see these messages.</p>
+        </div>
+        <CallButtons size="sm" />
       </div>
       <div className="flex-1 space-y-2 overflow-y-auto bg-slate-50 px-3 py-4" aria-live="polite">
         {hasMore && all.length > 0 && (

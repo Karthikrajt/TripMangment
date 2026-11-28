@@ -3,6 +3,11 @@ import type { User } from 'firebase/auth';
 import { db, tripPath } from '../lib/firebase';
 import type { Trip } from '../domain/types';
 import { logAudit, strip } from './base';
+import { newId } from '../lib/ids';
+import { makeCallRoom } from '../domain/call';
+
+/** A new random video-call room id (changing it makes old call links useless). */
+export const newCallRoom = () => makeCallRoom(() => newId() + newId());
 
 export const tripRef = () => doc(db, tripPath());
 export const publicSummaryRef = () => doc(db, tripPath('public', 'summary'));
@@ -22,7 +27,7 @@ export async function getPublicSummary(): Promise<PublicSummary | null> {
 }
 
 export type TripInput = Pick<Trip, 'name' | 'destination' | 'description' | 'startDate' | 'endDate' | 'emergencyInfo' | 'importantContacts' | 'ticketsLocked'> &
-  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent' | 'openJoin'>>;
+  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent' | 'openJoin' | 'callRoom' | 'whatsappGroupUrl'>>;
 
 /** First-run setup by the bootstrap admin: trip + public summary + admin membership, atomically. */
 export async function createTrip(user: User, input: TripInput): Promise<void> {

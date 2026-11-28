@@ -1,6 +1,6 @@
 import {
   Bell, BedDouble, Bus, CalendarDays, ClipboardCheck, FileClock, Hotel, Home, LayoutDashboard, Megaphone, MessagesSquare,
-  Radio, Receipt, ListChecks, Scale, Settings, Ticket, User, UserCheck, Users, BarChart3, Contact,
+  Radio, Receipt, ListChecks, Video, Scale, Settings, Ticket, User, UserCheck, Users, BarChart3, Contact,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -41,6 +41,7 @@ export const memberNav: NavGroup[] = [
     label: 'People',
     items: [
       { to: '/chat', label: 'Group Chat', icon: MessagesSquare, badge: 'chat' },
+      { to: '/call', label: 'Video call', icon: Video },
       { to: '/announcements', label: 'Announcements', icon: Megaphone },
       { to: '/members', label: 'Trip Members', icon: Users },
       { to: '/notifications', label: 'Notifications', icon: Bell, badge: 'notifications' },
@@ -86,6 +87,7 @@ export const adminNav: NavGroup[] = [
     items: [
       { to: '/announcements', label: 'Group Announcements', icon: Megaphone },
       { to: '/chat', label: 'Group Chat', icon: MessagesSquare, badge: 'chat' },
+      { to: '/call', label: 'Video call', icon: Video },
       { to: '/notifications', label: 'Notifications', icon: Bell, badge: 'notifications' },
       { to: '/admin/audit', label: 'Audit History', icon: FileClock },
       { to: '/profile', label: 'Profile', icon: User },

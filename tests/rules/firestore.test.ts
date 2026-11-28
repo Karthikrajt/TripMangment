@@ -423,3 +423,16 @@ describe('checklist & roll call', () => {
     await assertFails(setDoc(doc(db('owner'), `trips/${T}/reminders/x`), { a: 1 }));
   });
 });
+
+describe('video call settings', () => {
+  const base = { name: 'Trip', destination: 'Ooty', description: '', emergencyInfo: '', importantContacts: [], ticketsLocked: false, startDate: '', endDate: '', ownerUid: 'owner' };
+  it('admin sets the call room and WhatsApp group link; bad values rejected', async () => {
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, callRoom: 'trip-abc123', whatsappGroupUrl: 'https://chat.whatsapp.com/AbC123' }));
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, whatsappGroupUrl: '' }));
+    await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, whatsappGroupUrl: 'https://evil.example/x' }));
+    await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, callRoom: 'bad room/../x' }));
+  });
+  it('members cannot change them', async () => {
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}`), { ...base, callRoom: 'trip-mine' }));
+  });
+});
