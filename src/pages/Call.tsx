@@ -15,7 +15,7 @@ export default function Call() {
             <h1 className="text-2xl font-extrabold text-ink">Trip video call</h1>
             <p className="mt-1 text-slate-600">Free group call for {trip?.name ?? 'the trip'}. Allow camera and microphone when asked.</p>
           </div>
-          <CallButtons size="lg" className="justify-center" askToNotify={false} />
+          <CallButtons size="lg" className="justify-center" askToNotify={false} explainIfMissing />
           <ul className="space-y-1 text-left text-sm text-slate-500">
             <li>• <b>Video call</b> opens the trip’s private room (Jitsi Meet) – in the browser, or the Jitsi Meet app on phones if installed.</li>
             <li>• The first person to open the room signs in once with Google; everyone else just joins.</li>

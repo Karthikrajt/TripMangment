@@ -432,6 +432,10 @@ describe('video call settings', () => {
     await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, whatsappGroupUrl: 'https://evil.example/x' }));
     await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, callRoom: 'bad room/../x' }));
   });
+  it('admin can save just the call fields (as the Video calls card does)', async () => {
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { callRoom: 'trip-only123', updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { whatsappGroupUrl: 'https://chat.whatsapp.com/Only123', updatedAt: serverTimestamp() }));
+  });
   it('members cannot change them', async () => {
     await assertFails(updateDoc(doc(db('alice'), `trips/${T}`), { ...base, callRoom: 'trip-mine' }));
   });

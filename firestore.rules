@@ -75,9 +75,9 @@ service cloud.firestore {
       allow update: if isAdmin(tripId)
         && unchanged(['ownerUid', 'createdAt'])
         && str(incoming().name, 120) && str(incoming().destination, 120)
-        && str(incoming().description, 2000) && str(incoming().emergencyInfo, 2000)
+        && str(incoming().get('description', ''), 2000) && str(incoming().get('emergencyInfo', ''), 2000)
         && isDate(incoming().startDate) && isDate(incoming().endDate)
-        && strList(incoming().importantContacts, 30)
+        && strList(incoming().get('importantContacts', []), 30)
         && incoming().ticketsLocked is bool
         && pct(incoming(), 'childSharePercent') && pct(incoming(), 'infantSharePercent')
         && (!('openJoin' in incoming()) || incoming().openJoin is bool)

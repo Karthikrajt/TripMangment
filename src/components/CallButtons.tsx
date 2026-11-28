@@ -15,7 +15,7 @@ import { Modal } from './ui/Modal';
 import { WhatsAppIcon } from './ShareWhatsApp';
 import { toast } from './ui/Toast';
 
-export function CallButtons({ size = 'md', className = '', askToNotify = true }: { size?: 'sm' | 'md' | 'lg'; className?: string; askToNotify?: boolean }) {
+export function CallButtons({ size = 'md', className = '', askToNotify = true, explainIfMissing = false }: { size?: 'sm' | 'md' | 'lg'; className?: string; askToNotify?: boolean; explainIfMissing?: boolean }) {
   const trip = useSession((s) => s.trip);
   const me = useSession((s) => s.member);
   const admin = useIsAdmin();
@@ -25,8 +25,9 @@ export function CallButtons({ size = 'md', className = '', askToNotify = true }:
   const icon = size === 'sm' ? 'size-4' : 'size-5';
 
   if (!room && !group) {
-    return admin ? (
-      <Link to="/admin/settings" className={buttonClass('secondary', size, className)}><Video className={icon} /> Set up video calls</Link>
+    if (admin) return <Link to="/admin/settings" className={buttonClass(explainIfMissing ? 'primary' : 'secondary', size, className)}><Video className={icon} /> Set up video calls</Link>;
+    return explainIfMissing ? (
+      <p className="rounded-2xl bg-amber-50 p-4 text-amber-900">Video calls aren’t set up yet. Ask the trip admin to open <b>Trip Settings → Video calls</b> and tap <b>Create call link</b>.</p>
     ) : null;
   }
 

@@ -9,7 +9,7 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Checkbox, FormError, TextArea, TextField } from '../../components/ui/Field';
 import { Spinner } from '../../components/ui/Feedback';
 import { toast } from '../../components/ui/Toast';
-import { newCallRoom, updateTrip } from '../../services/trip';
+import { newCallRoom, updateCallSettings, updateTrip } from '../../services/trip';
 import { errorMessage } from '../../lib/retry';
 import { isISODate, isPhone } from '../../domain/validation';
 
@@ -27,17 +27,20 @@ export default function TripSettings() {
   const setContact = (i: number, k: 'name' | 'phone' | 'note', val: string) =>
     setV({ ...v, importantContacts: v.importantContacts.map((c, j) => (j === i ? { ...c, [k]: val } : c)) });
 
+  // Errors show at the bottom of a long page – also pop them up so they are seen.
+  const fail = (msg: string) => {
+    setError(msg);
+    toast.error(msg);
+  };
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!v.name.trim() || !v.destination.trim()) return setError('Trip name and destination are required.');
-    if (!isISODate(v.startDate) || !isISODate(v.endDate) || v.endDate < v.startDate) return setError('Please enter valid start and end dates.');
+    if (!v.name.trim() || !v.destination.trim()) return fail('Trip name and destination are required.');
+    if (!isISODate(v.startDate) || !isISODate(v.endDate) || v.endDate < v.startDate) return fail('Please enter valid start and end dates.');
     const contacts = v.importantContacts.filter((c) => c.name.trim() || c.phone.trim());
-    if (contacts.some((c) => !c.name.trim() || !isPhone(c.phone))) return setError('Each contact needs a name and a valid phone number.');
+    if (contacts.some((c) => !c.name.trim() || !isPhone(c.phone))) return fail('Each contact needs a name and a valid phone number.');
     const child = Number(shares.child);
     const infant = Number(shares.infant);
-    if (![child, infant].every((x) => Number.isInteger(x) && x >= 0 && x <= 100)) return setError('Child and infant shares must be whole numbers from 0 to 100.');
-    const group = (v.whatsappGroupUrl ?? '').trim();
-    if (group && !isWhatsappGroupUrl(group)) return setError('WhatsApp group link should look like https://chat.whatsapp.com/… (WhatsApp → group → Invite via link → Copy link).');
+    if (![child, infant].every((x) => Number.isInteger(x) && x >= 0 && x <= 100)) return fail('Child and infant shares must be whole numbers from 0 to 100.');
     setBusy(true);
     setError(null);
     try {
@@ -53,12 +56,10 @@ export default function TripSettings() {
         importantContacts: contacts.map((c) => ({ name: c.name.trim(), phone: c.phone.trim(), note: (c.note ?? '').trim() })),
         ticketsLocked: v.ticketsLocked,
         openJoin: v.openJoin !== false,
-        callRoom: v.callRoom ?? '',
-        whatsappGroupUrl: group ? normaliseWhatsappGroupUrl(group) : '',
       });
       toast.success('Trip settings saved');
     } catch (err) {
-      setError(errorMessage(err));
+      fail(errorMessage(err));
     } finally {
       setBusy(false);
     }
@@ -67,6 +68,7 @@ export default function TripSettings() {
   return (
     <form onSubmit={save} className="mx-auto max-w-3xl space-y-6">
       <PageHeader title="Trip Settings" actions={<Button type="submit" loading={busy}>Save changes</Button>} />
+      <VideoCallSettings />
       <Card>
         <CardHeader title="Trip details" />
         <CardBody className="grid gap-4 sm:grid-cols-2">
@@ -109,30 +111,6 @@ export default function TripSettings() {
         </CardBody>
       </Card>
       <Card>
-        <CardHeader icon={<Video className="size-5" />} title="Video calls" subtitle="Free. Members see a Video call button in Chat, Trip Live and the menu." />
-        <CardBody className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
-            <div className="min-w-0">
-              <p className="font-semibold text-ink">Trip video room (Jitsi Meet)</p>
-              <p className="text-sm text-slate-600">{v.callRoom ? 'Ready. Only trip members can see the link.' : 'Not set up yet.'} The first person to open the room signs in once with Google; others just join.</p>
-            </div>
-            <Button size="sm" variant={v.callRoom ? 'secondary' : 'primary'} icon={v.callRoom ? <RefreshCw className="size-4" /> : <Video className="size-4" />} onClick={() => setV({ ...v, callRoom: newCallRoom() })}>
-              {v.callRoom ? 'Make a new link' : 'Create call link'}
-            </Button>
-          </div>
-          <TextField
-            label="WhatsApp group invite link (optional)"
-            inputMode="url"
-            maxLength={200}
-            value={v.whatsappGroupUrl ?? ''}
-            onChange={(e) => setV({ ...v, whatsappGroupUrl: e.target.value })}
-            placeholder="https://chat.whatsapp.com/…"
-            hint="WhatsApp → your trip group → Invite via link → Copy link. Adds an “Open WhatsApp group” button for group video calls there."
-          />
-          <p className="text-sm text-slate-500">Remember to tap Save changes.</p>
-        </CardBody>
-      </Card>
-      <Card>
         <CardHeader icon={<Users className="size-5" />} title="Expense split per head" subtitle="Share of one adult. You can still give any child or infant their own % under Member Management." />
         <CardBody className="grid gap-4 sm:grid-cols-3">
           <TextField label="Adult" value="100%" disabled hint="Always a full share" />
@@ -149,5 +127,75 @@ export default function TripSettings() {
       </Card>
       <FormError message={error} />
     </form>
+  );
+}
+
+/** Saves on its own (not with "Save changes"), so other fields can never block it. */
+function VideoCallSettings() {
+  const trip = useSession((s) => s.trip);
+  const [group, setGroup] = useState(trip?.whatsappGroupUrl ?? '');
+  const [busy, setBusy] = useState<'room' | 'group' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setGroup(trip?.whatsappGroupUrl ?? ''), [trip?.whatsappGroupUrl]);
+  if (!trip) return null;
+  const room = trip.callRoom;
+
+  const run = async (kind: 'room' | 'group', work: () => Promise<void>, ok: string) => {
+    setBusy(kind);
+    setError(null);
+    try {
+      await work();
+      toast.success(ok);
+    } catch (e) {
+      const msg = errorMessage(e);
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const makeRoom = () => run('room', () => updateCallSettings(trip, { callRoom: newCallRoom() }), room ? 'New video call link ready – the old one no longer works' : 'Video call link ready');
+  const saveGroup = () => {
+    const raw = group.trim();
+    if (raw && !isWhatsappGroupUrl(raw)) {
+      const msg = 'That doesn’t look like a WhatsApp group link. In WhatsApp: open the group → Invite via link → Copy link, then paste here.';
+      setError(msg);
+      toast.error(msg);
+      return;
+    }
+    const url = raw ? normaliseWhatsappGroupUrl(raw) : '';
+    setGroup(url);
+    return run('group', () => updateCallSettings(trip, { whatsappGroupUrl: url }), url ? 'WhatsApp group link saved' : 'WhatsApp group link removed');
+  };
+
+  return (
+    <Card>
+      <CardHeader icon={<Video className="size-5" />} title="Video calls" subtitle="Free. Members see a Video call button in Chat, Trip Live and the menu. Saved straight away." />
+      <CardBody className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">Trip video room (Jitsi Meet)</p>
+            <p className="text-sm text-slate-600">{room ? '✅ Ready. Only trip members can see the link.' : 'Not set up yet – tap the button.'} The first person to open the room signs in once with Google; others just join.</p>
+          </div>
+          <Button size="sm" variant={room ? 'secondary' : 'primary'} loading={busy === 'room'} icon={room ? <RefreshCw className="size-4" /> : <Video className="size-4" />} onClick={makeRoom}>
+            {room ? 'Make a new link' : 'Create call link'}
+          </Button>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <TextField
+            className="flex-1"
+            label="WhatsApp group invite link (optional)"
+            inputMode="url"
+            maxLength={500}
+            value={group}
+            onChange={(e) => setGroup(e.target.value)}
+            placeholder="https://chat.whatsapp.com/…"
+            hint="WhatsApp → your trip group → Invite via link → Copy link (the whole message is fine)."
+          />
+          <Button className="sm:mt-7" variant="secondary" loading={busy === 'group'} disabled={group.trim() === (trip.whatsappGroupUrl ?? '')} onClick={saveGroup}>Save link</Button>
+        </div>
+        <FormError message={error} />
+      </CardBody>
+    </Card>
   );
 }

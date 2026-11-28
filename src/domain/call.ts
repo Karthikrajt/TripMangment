@@ -18,10 +18,15 @@ export function jitsiUrl(room: string, displayName: string): string {
   return `https://meet.jit.si/${encodeURIComponent(room)}#userInfo.displayName=${name}&config.prejoinPageEnabled=true`;
 }
 
-/** Accepts the invite link as WhatsApp copies it (extra spaces, query string, trailing slash). */
+/**
+ * Accepts the invite link however WhatsApp copies it: the bare link, the
+ * whole "Follow this link to join my WhatsApp group: …" sentence, an
+ * /invite/ path, a query string or a trailing slash. Returns
+ * https://chat.whatsapp.com/<code>, or the trimmed input if no link is found.
+ */
 export function normaliseWhatsappGroupUrl(v: string): string {
-  const t = v.trim().replace(/^http:\/\//, 'https://').split(/[?#]/)[0].replace(/\/+$/, '');
-  return t;
+  const m = /(?:https?:\/\/)?chat\.whatsapp\.com\/(?:invite\/)?([A-Za-z0-9]+)/i.exec(v);
+  return m ? `https://chat.whatsapp.com/${m[1]}` : v.trim();
 }
 
 export function isWhatsappGroupUrl(v: string): boolean {
