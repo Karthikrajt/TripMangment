@@ -17,8 +17,12 @@ describe('video call helpers', () => {
     expect(isWhatsappGroupUrl('https://chat.whatsapp.com/AbCdEf123456')).toBe(true);
     expect(isWhatsappGroupUrl(' https://chat.whatsapp.com/AbCdEf123456/?mode=r_c ')).toBe(true);
     expect(normaliseWhatsappGroupUrl('http://chat.whatsapp.com/Abc/')).toBe('https://chat.whatsapp.com/Abc');
+    expect(normaliseWhatsappGroupUrl('Follow this link to join my WhatsApp group: https://chat.whatsapp.com/AbC123xyz')).toBe('https://chat.whatsapp.com/AbC123xyz');
+    expect(normaliseWhatsappGroupUrl('https://chat.whatsapp.com/invite/AbC123')).toBe('https://chat.whatsapp.com/AbC123');
+    expect(normaliseWhatsappGroupUrl('chat.whatsapp.com/AbC123?mode=wwt')).toBe('https://chat.whatsapp.com/AbC123');
+    expect(isWhatsappGroupUrl('Join: https://chat.whatsapp.com/AbC123 thanks')).toBe(true);
     expect(isWhatsappGroupUrl('https://wa.me/919876543210')).toBe(false);
     expect(isWhatsappGroupUrl('https://chat.whatsapp.com/')).toBe(false);
-    expect(isWhatsappGroupUrl('https://evil.com/chat.whatsapp.com/abc')).toBe(false);
+    expect(isWhatsappGroupUrl('just some text')).toBe(false);
   });
 });

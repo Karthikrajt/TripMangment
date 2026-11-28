@@ -58,3 +58,9 @@ export async function updateTrip(before: Trip, input: TripInput): Promise<void> 
   await setDoc(publicSummaryRef(), { name: input.name, destination: input.destination, startDate: input.startDate, endDate: input.endDate, openJoin: input.openJoin ?? before.openJoin ?? true });
   await logAudit('update', 'trip', before.id, `Updated trip settings`, strip(before as never), input as never);
 }
+
+/** Video-call settings are saved on their own, so the rest of the form can't block them. */
+export async function updateCallSettings(trip: Trip, patch: Partial<Pick<Trip, 'callRoom' | 'whatsappGroupUrl'>>): Promise<void> {
+  await updateDoc(tripRef(), { ...patch, updatedAt: serverTimestamp() });
+  await logAudit('update', 'trip', trip.id, `Updated video call settings (${Object.keys(patch).join(', ')})`, null, patch as never);
+}

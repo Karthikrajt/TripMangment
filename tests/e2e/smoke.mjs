@@ -486,11 +486,15 @@ try {
   ok('WhatsApp share on itinerary days, tickets and Trip Live');
 
   // Free video calls: admin creates the Jitsi room and adds the WhatsApp group link
+  await alice.goto(`${BASE}/call`);
+  await alice.getByText('Video calls aren’t set up yet').waitFor();
   await admin.goto(`${BASE}/admin/settings`);
   await admin.getByRole('button', { name: 'Create call link' }).click();
-  await admin.getByLabel('WhatsApp group invite link (optional)').fill('https://chat.whatsapp.com/TestGroup123?mode=r_c');
-  await admin.getByRole('button', { name: 'Save changes' }).click();
-  await admin.getByText('Trip settings saved').waitFor();
+  await admin.getByText('Video call link ready').waitFor();
+  await admin.getByLabel('WhatsApp group invite link (optional)').fill('Follow this link to join my WhatsApp group: https://chat.whatsapp.com/TestGroup123');
+  await admin.getByRole('button', { name: 'Save link' }).click();
+  await admin.getByText('WhatsApp group link saved').waitFor();
+  await shot(admin, 'video-call-settings');
   await alice.goto(`${BASE}/chat`);
   const call = alice.getByRole('link', { name: 'Video call' });
   const callHref = await call.getAttribute('href');
@@ -506,7 +510,7 @@ try {
   await admin.getByRole('dialog', { name: 'Let everyone know?' }).getByRole('button', { name: 'Notify everyone' }).click();
   await alice.goto(`${BASE}/notifications`);
   await alice.getByText('Ravi Kumar started a video call').waitFor();
-  ok('Video call: private Jitsi room + WhatsApp group link; "Notify everyone" reaches the others');
+  ok('Video call: "not set up" message, one-tap call link, pasted WhatsApp message accepted; "Notify everyone" reaches the others');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

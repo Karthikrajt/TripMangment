@@ -134,6 +134,7 @@ export default function Profile() {
         <CardBody className="space-y-4">
           {install.canInstall && <Button icon={<Download className="size-5" />} onClick={install.prompt}>Install app on this device</Button>}
           {install.isIos && !install.standalone && <Notice>To install on iPhone: tap the Share button in Safari, then “Add to Home Screen”.</Notice>}
+          <p className="text-sm text-slate-500">App version: {new Intl.DateTimeFormat('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(__BUILD_TIME__))}</p>
           <Checkbox
             label="This is a shared or borrowed device"
             description="Keep trip data in memory only (requires reload). Offline access will not be available."
