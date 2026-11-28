@@ -31,6 +31,10 @@ export interface Trip {
   infantSharePercent?: number;
   /** Anyone who signs in joins without admin approval (default true). */
   openJoin?: boolean;
+  /** Jitsi room id for the trip's video call (random, only members can read it) */
+  callRoom?: string;
+  /** WhatsApp group invite link (https://chat.whatsapp.com/…) */
+  whatsappGroupUrl?: string;
   createdAt: TS;
   updatedAt: TS;
 }
@@ -290,7 +294,8 @@ export type NotificationType =
   | 'member_joined'
   | 'reminder'
   | 'roll_call'
-  | 'payment_reported';
+  | 'payment_reported'
+  | 'video_call';
 
 export interface AppNotification {
   id: string;

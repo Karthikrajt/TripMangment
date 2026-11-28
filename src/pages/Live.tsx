@@ -2,7 +2,7 @@ import { ShareWhatsApp } from '../components/ShareWhatsApp';
 import { liveText, pickupText } from '../domain/share';
 import { personIdOf } from '../domain/people';
 import { Link } from 'react-router-dom';
-import { Bus, CalendarDays, Hotel, Megaphone, MessagesSquare, Phone, Receipt, ShieldAlert, Ticket, Train, BedDouble, ListChecks, UserCheck } from 'lucide-react';
+import { Bus, CalendarDays, Hotel, Megaphone, MessagesSquare, Phone, Receipt, ShieldAlert, Ticket, Train, BedDouble, ListChecks, UserCheck, Video } from 'lucide-react';
 import { useSession } from '../store/session';
 import { berthLabel, passengersOf } from '../domain/ticketPassengers';
 import { useAccommodations, useAnnouncements, useItinerary, useRooms, useTickets, useTransport } from '../hooks/data';
@@ -145,6 +145,7 @@ export default function Live() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
+        <ButtonLink to="/call" size="lg" variant="secondary" className="col-span-2" icon={<Video className="size-5" />}>Video call</ButtonLink>
         <ButtonLink to="/checklist" size="lg" variant="secondary" icon={<UserCheck className="size-5" />}>Roll call</ButtonLink>
         <ButtonLink to="/checklist" size="lg" variant="secondary" icon={<ListChecks className="size-5" />}>Checklist</ButtonLink>
         <ButtonLink to="/chat" size="lg" variant="secondary" icon={<MessagesSquare className="size-5" />}>Group chat</ButtonLink>

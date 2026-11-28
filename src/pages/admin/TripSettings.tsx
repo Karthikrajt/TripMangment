@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Lock, Users, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Lock, Users, UserPlus, Video, RefreshCw } from 'lucide-react';
+import { isWhatsappGroupUrl, normaliseWhatsappGroupUrl } from '../../domain/call';
 import { sharesFromTrip } from '../../domain/people';
 import { useSession } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -8,7 +9,7 @@ import { Card, CardBody, CardHeader } from '../../components/ui/Card';
 import { Checkbox, FormError, TextArea, TextField } from '../../components/ui/Field';
 import { Spinner } from '../../components/ui/Feedback';
 import { toast } from '../../components/ui/Toast';
-import { updateTrip } from '../../services/trip';
+import { newCallRoom, updateTrip } from '../../services/trip';
 import { errorMessage } from '../../lib/retry';
 import { isISODate, isPhone } from '../../domain/validation';
 
@@ -35,6 +36,8 @@ export default function TripSettings() {
     const child = Number(shares.child);
     const infant = Number(shares.infant);
     if (![child, infant].every((x) => Number.isInteger(x) && x >= 0 && x <= 100)) return setError('Child and infant shares must be whole numbers from 0 to 100.');
+    const group = (v.whatsappGroupUrl ?? '').trim();
+    if (group && !isWhatsappGroupUrl(group)) return setError('WhatsApp group link should look like https://chat.whatsapp.com/… (WhatsApp → group → Invite via link → Copy link).');
     setBusy(true);
     setError(null);
     try {
@@ -50,6 +53,8 @@ export default function TripSettings() {
         importantContacts: contacts.map((c) => ({ name: c.name.trim(), phone: c.phone.trim(), note: (c.note ?? '').trim() })),
         ticketsLocked: v.ticketsLocked,
         openJoin: v.openJoin !== false,
+        callRoom: v.callRoom ?? '',
+        whatsappGroupUrl: group ? normaliseWhatsappGroupUrl(group) : '',
       });
       toast.success('Trip settings saved');
     } catch (err) {
@@ -101,6 +106,30 @@ export default function TripSettings() {
             checked={v.openJoin !== false}
             onChange={(x) => setV({ ...v, openJoin: x })}
           />
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader icon={<Video className="size-5" />} title="Video calls" subtitle="Free. Members see a Video call button in Chat, Trip Live and the menu." />
+        <CardBody className="space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+            <div className="min-w-0">
+              <p className="font-semibold text-ink">Trip video room (Jitsi Meet)</p>
+              <p className="text-sm text-slate-600">{v.callRoom ? 'Ready. Only trip members can see the link.' : 'Not set up yet.'} The first person to open the room signs in once with Google; others just join.</p>
+            </div>
+            <Button size="sm" variant={v.callRoom ? 'secondary' : 'primary'} icon={v.callRoom ? <RefreshCw className="size-4" /> : <Video className="size-4" />} onClick={() => setV({ ...v, callRoom: newCallRoom() })}>
+              {v.callRoom ? 'Make a new link' : 'Create call link'}
+            </Button>
+          </div>
+          <TextField
+            label="WhatsApp group invite link (optional)"
+            inputMode="url"
+            maxLength={200}
+            value={v.whatsappGroupUrl ?? ''}
+            onChange={(e) => setV({ ...v, whatsappGroupUrl: e.target.value })}
+            placeholder="https://chat.whatsapp.com/…"
+            hint="WhatsApp → your trip group → Invite via link → Copy link. Adds an “Open WhatsApp group” button for group video calls there."
+          />
+          <p className="text-sm text-slate-500">Remember to tap Save changes.</p>
         </CardBody>
       </Card>
       <Card>

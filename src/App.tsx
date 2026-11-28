@@ -22,6 +22,7 @@ const Rooms = lazy(() => import('./pages/Rooms'));
 const Transport = lazy(() => import('./pages/Transport'));
 const Vendors = lazy(() => import('./pages/Vendors'));
 const Checklist = lazy(() => import('./pages/Checklist'));
+const Call = lazy(() => import('./pages/Call'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const ExpenseForm = lazy(() => import('./pages/ExpenseForm'));
 const Settlements = lazy(() => import('./pages/Settlements'));
@@ -75,6 +76,7 @@ function ApprovedApp() {
           <Route path="/transport" element={<Transport />} />
           <Route path="/vendors" element={<Vendors />} />
           <Route path="/checklist" element={<Checklist />} />
+          <Route path="/call" element={<Call />} />
           <Route path="/expenses" element={<Expenses />} />
           <Route path="/expenses/new" element={<ExpenseForm />} />
           <Route path="/expenses/:id/edit" element={<ExpenseForm />} />

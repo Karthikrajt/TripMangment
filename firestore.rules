@@ -80,7 +80,10 @@ service cloud.firestore {
         && strList(incoming().importantContacts, 30)
         && incoming().ticketsLocked is bool
         && pct(incoming(), 'childSharePercent') && pct(incoming(), 'infantSharePercent')
-        && (!('openJoin' in incoming()) || incoming().openJoin is bool);
+        && (!('openJoin' in incoming()) || incoming().openJoin is bool)
+        && (!('callRoom' in incoming()) || (incoming().callRoom is string && incoming().callRoom.matches('^[A-Za-z0-9-]{0,64}$')))
+        && (!('whatsappGroupUrl' in incoming()) || (str(incoming().whatsappGroupUrl, 200)
+            && (incoming().whatsappGroupUrl == '' || incoming().whatsappGroupUrl.matches('^https://chat[.]whatsapp[.]com/[A-Za-z0-9]+$'))));
       allow delete: if false;
 
       // Minimal public summary so signed-in, not-yet-approved users can see

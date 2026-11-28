@@ -484,6 +484,29 @@ try {
   await alice.locator('[aria-expanded]').first().click();
   await alice.getByRole('link', { name: 'Share details' }).first().waitFor();
   ok('WhatsApp share on itinerary days, tickets and Trip Live');
+
+  // Free video calls: admin creates the Jitsi room and adds the WhatsApp group link
+  await admin.goto(`${BASE}/admin/settings`);
+  await admin.getByRole('button', { name: 'Create call link' }).click();
+  await admin.getByLabel('WhatsApp group invite link (optional)').fill('https://chat.whatsapp.com/TestGroup123?mode=r_c');
+  await admin.getByRole('button', { name: 'Save changes' }).click();
+  await admin.getByText('Trip settings saved').waitFor();
+  await alice.goto(`${BASE}/chat`);
+  const call = alice.getByRole('link', { name: 'Video call' });
+  const callHref = await call.getAttribute('href');
+  if (!/^https:\/\/meet\.jit\.si\/trip-[A-Za-z0-9]{20}#userInfo\.displayName=/.test(callHref ?? '')) throw new Error(`bad Jitsi link ${callHref}`);
+  if ((await alice.getByRole('link', { name: 'WhatsApp group' }).getAttribute('href')) !== 'https://chat.whatsapp.com/TestGroup123') throw new Error('bad WhatsApp group link');
+  await alice.goto(`${BASE}/call`);
+  await alice.getByRole('heading', { name: 'Trip video call' }).waitFor();
+  await shot(alice, 'video-call-mobile');
+  await admin.goto(`${BASE}/chat`);
+  await admin.context().route('https://meet.jit.si/**', (r) => r.fulfill({ status: 200, body: 'jitsi' }));
+  const [popup] = await Promise.all([admin.waitForEvent('popup'), admin.locator('a[href^="https://meet.jit.si/"]').click()]);
+  await popup.close();
+  await admin.getByRole('dialog', { name: 'Let everyone know?' }).getByRole('button', { name: 'Notify everyone' }).click();
+  await alice.goto(`${BASE}/notifications`);
+  await alice.getByText('Ravi Kumar started a video call').waitFor();
+  ok('Video call: private Jitsi room + WhatsApp group link; "Notify everyone" reaches the others');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);
