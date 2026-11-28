@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Lock, Users, UserPlus, Video, RefreshCw } from 'lucide-react';
-import { isWhatsappGroupUrl, normaliseWhatsappGroupUrl } from '../../domain/call';
+import { isMeetUrl, isWhatsappGroupUrl, normaliseMeetUrl, normaliseWhatsappGroupUrl } from '../../domain/call';
 import { sharesFromTrip } from '../../domain/people';
 import { useSession } from '../../store/session';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -133,69 +133,109 @@ export default function TripSettings() {
 /** Saves on its own (not with "Save changes"), so other fields can never block it. */
 function VideoCallSettings() {
   const trip = useSession((s) => s.trip);
-  const [group, setGroup] = useState(trip?.whatsappGroupUrl ?? '');
-  const [busy, setBusy] = useState<'room' | 'group' | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => setGroup(trip?.whatsappGroupUrl ?? ''), [trip?.whatsappGroupUrl]);
+  const [busy, setBusy] = useState(false);
   if (!trip) return null;
   const room = trip.callRoom;
 
-  const run = async (kind: 'room' | 'group', work: () => Promise<void>, ok: string) => {
-    setBusy(kind);
+  const makeRoom = async () => {
+    setBusy(true);
+    try {
+      await updateCallSettings(trip, { callRoom: newCallRoom() });
+      toast.success(room ? 'New video call link ready – the old one no longer works' : 'Video call link ready');
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader icon={<Video className="size-5" />} title="Video calls" subtitle="Free. Each one you set up shows as a button in Chat, Trip Live and the menu. Saved straight away." />
+      <CardBody className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-ink">Trip video room (Jitsi Meet)</p>
+            <p className="text-sm text-slate-600">{room ? '✅ Ready. Only trip members can see the link.' : 'Not set up yet – tap the button.'} No time limit. The first person to open the room signs in once with Google; others just join.</p>
+          </div>
+          <Button size="sm" variant={room ? 'secondary' : 'primary'} loading={busy} icon={room ? <RefreshCw className="size-4" /> : <Video className="size-4" />} onClick={makeRoom}>
+            {room ? 'Make a new link' : 'Create call link'}
+          </Button>
+        </div>
+        <CallLinkField
+          trip={trip}
+          field="googleMeetUrl"
+          label="Google Meet link (optional)"
+          placeholder="https://meet.google.com/abc-defg-hij"
+          hint="Open meet.google.com → New meeting → Create a meeting for later → copy the link. Free Gmail: calls with 3+ people end after 60 minutes – just tap the button again."
+          isValid={isMeetUrl}
+          normalise={normaliseMeetUrl}
+          invalid="That doesn’t look like a Google Meet link. It looks like https://meet.google.com/abc-defg-hij."
+          saved="Google Meet link saved"
+        />
+        <CallLinkField
+          trip={trip}
+          field="whatsappGroupUrl"
+          label="WhatsApp group invite link (optional)"
+          placeholder="https://chat.whatsapp.com/…"
+          hint="WhatsApp → your trip group → Invite via link → Copy link (the whole message is fine)."
+          isValid={isWhatsappGroupUrl}
+          normalise={normaliseWhatsappGroupUrl}
+          invalid="That doesn’t look like a WhatsApp group link. In WhatsApp: open the group → Invite via link → Copy link, then paste here."
+          saved="WhatsApp group link saved"
+        />
+      </CardBody>
+    </Card>
+  );
+}
+
+function CallLinkField(props: {
+  trip: NonNullable<ReturnType<typeof useSession.getState>['trip']>;
+  field: 'googleMeetUrl' | 'whatsappGroupUrl';
+  label: string;
+  placeholder: string;
+  hint: string;
+  isValid: (v: string) => boolean;
+  normalise: (v: string) => string;
+  invalid: string;
+  saved: string;
+}) {
+  const current = props.trip[props.field] ?? '';
+  const [value, setValue] = useState(current);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => setValue(current), [current]);
+
+  const save = async () => {
+    const raw = value.trim();
+    if (raw && !props.isValid(raw)) {
+      setError(props.invalid);
+      toast.error(props.invalid);
+      return;
+    }
+    const url = raw ? props.normalise(raw) : '';
+    setValue(url);
+    setBusy(true);
     setError(null);
     try {
-      await work();
-      toast.success(ok);
+      await updateCallSettings(props.trip, { [props.field]: url });
+      toast.success(url ? props.saved : 'Link removed');
     } catch (e) {
       const msg = errorMessage(e);
       setError(msg);
       toast.error(msg);
     } finally {
-      setBusy(null);
+      setBusy(false);
     }
-  };
-  const makeRoom = () => run('room', () => updateCallSettings(trip, { callRoom: newCallRoom() }), room ? 'New video call link ready – the old one no longer works' : 'Video call link ready');
-  const saveGroup = () => {
-    const raw = group.trim();
-    if (raw && !isWhatsappGroupUrl(raw)) {
-      const msg = 'That doesn’t look like a WhatsApp group link. In WhatsApp: open the group → Invite via link → Copy link, then paste here.';
-      setError(msg);
-      toast.error(msg);
-      return;
-    }
-    const url = raw ? normaliseWhatsappGroupUrl(raw) : '';
-    setGroup(url);
-    return run('group', () => updateCallSettings(trip, { whatsappGroupUrl: url }), url ? 'WhatsApp group link saved' : 'WhatsApp group link removed');
   };
 
   return (
-    <Card>
-      <CardHeader icon={<Video className="size-5" />} title="Video calls" subtitle="Free. Members see a Video call button in Chat, Trip Live and the menu. Saved straight away." />
-      <CardBody className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-50 p-3">
-          <div className="min-w-0">
-            <p className="font-semibold text-ink">Trip video room (Jitsi Meet)</p>
-            <p className="text-sm text-slate-600">{room ? '✅ Ready. Only trip members can see the link.' : 'Not set up yet – tap the button.'} The first person to open the room signs in once with Google; others just join.</p>
-          </div>
-          <Button size="sm" variant={room ? 'secondary' : 'primary'} loading={busy === 'room'} icon={room ? <RefreshCw className="size-4" /> : <Video className="size-4" />} onClick={makeRoom}>
-            {room ? 'Make a new link' : 'Create call link'}
-          </Button>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
-          <TextField
-            className="flex-1"
-            label="WhatsApp group invite link (optional)"
-            inputMode="url"
-            maxLength={500}
-            value={group}
-            onChange={(e) => setGroup(e.target.value)}
-            placeholder="https://chat.whatsapp.com/…"
-            hint="WhatsApp → your trip group → Invite via link → Copy link (the whole message is fine)."
-          />
-          <Button className="sm:mt-7" variant="secondary" loading={busy === 'group'} disabled={group.trim() === (trip.whatsappGroupUrl ?? '')} onClick={saveGroup}>Save link</Button>
-        </div>
-        <FormError message={error} />
-      </CardBody>
-    </Card>
+    <div className="space-y-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <TextField className="flex-1" label={props.label} inputMode="url" maxLength={500} value={value} onChange={(e) => setValue(e.target.value)} placeholder={props.placeholder} hint={props.hint} />
+        <Button className="sm:mt-7" variant="secondary" loading={busy} disabled={value.trim() === current} onClick={save} aria-label={`Save ${props.label.replace(' (optional)', '')}`}>Save link</Button>
+      </div>
+      <FormError message={error} />
+    </div>
   );
 }

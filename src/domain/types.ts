@@ -35,6 +35,8 @@ export interface Trip {
   callRoom?: string;
   /** WhatsApp group invite link (https://chat.whatsapp.com/…) */
   whatsappGroupUrl?: string;
+  /** Google Meet link (https://meet.google.com/abc-defg-hij) */
+  googleMeetUrl?: string;
   createdAt: TS;
   updatedAt: TS;
 }

@@ -492,14 +492,18 @@ try {
   await admin.getByRole('button', { name: 'Create call link' }).click();
   await admin.getByText('Video call link ready').waitFor();
   await admin.getByLabel('WhatsApp group invite link (optional)').fill('Follow this link to join my WhatsApp group: https://chat.whatsapp.com/TestGroup123');
-  await admin.getByRole('button', { name: 'Save link' }).click();
+  await admin.getByRole('button', { name: 'Save WhatsApp group invite link' }).click();
   await admin.getByText('WhatsApp group link saved').waitFor();
+  await admin.getByLabel('Google Meet link (optional)').fill('Join with Google Meet: https://meet.google.com/abc-defg-hij?authuser=0');
+  await admin.getByRole('button', { name: 'Save Google Meet link' }).click();
+  await admin.getByText('Google Meet link saved').waitFor();
   await shot(admin, 'video-call-settings');
   await alice.goto(`${BASE}/chat`);
   const call = alice.getByRole('link', { name: 'Video call' });
   const callHref = await call.getAttribute('href');
   if (!/^https:\/\/meet\.jit\.si\/trip-[A-Za-z0-9]{20}#userInfo\.displayName=/.test(callHref ?? '')) throw new Error(`bad Jitsi link ${callHref}`);
   if ((await alice.getByRole('link', { name: 'WhatsApp group' }).getAttribute('href')) !== 'https://chat.whatsapp.com/TestGroup123') throw new Error('bad WhatsApp group link');
+  if ((await alice.getByRole('link', { name: 'Google Meet' }).getAttribute('href')) !== 'https://meet.google.com/abc-defg-hij') throw new Error('bad Google Meet link');
   await alice.goto(`${BASE}/call`);
   await alice.getByRole('heading', { name: 'Trip video call' }).waitFor();
   await shot(alice, 'video-call-mobile');
@@ -510,7 +514,7 @@ try {
   await admin.getByRole('dialog', { name: 'Let everyone know?' }).getByRole('button', { name: 'Notify everyone' }).click();
   await alice.goto(`${BASE}/notifications`);
   await alice.getByText('Ravi Kumar started a video call').waitFor();
-  ok('Video call: "not set up" message, one-tap call link, pasted WhatsApp message accepted; "Notify everyone" reaches the others');
+  ok('Video call: "not set up" message, one-tap call link, pasted WhatsApp message and Google Meet link accepted; "Notify everyone" reaches the others');
 } catch (e) {
   console.error('✘ FAILED:', e.message);
   errors.push(e.message);

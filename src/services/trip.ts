@@ -27,7 +27,7 @@ export async function getPublicSummary(): Promise<PublicSummary | null> {
 }
 
 export type TripInput = Pick<Trip, 'name' | 'destination' | 'description' | 'startDate' | 'endDate' | 'emergencyInfo' | 'importantContacts' | 'ticketsLocked'> &
-  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent' | 'openJoin' | 'callRoom' | 'whatsappGroupUrl'>>;
+  Partial<Pick<Trip, 'childSharePercent' | 'infantSharePercent' | 'openJoin' | 'callRoom' | 'whatsappGroupUrl' | 'googleMeetUrl'>>;
 
 /** First-run setup by the bootstrap admin: trip + public summary + admin membership, atomically. */
 export async function createTrip(user: User, input: TripInput): Promise<void> {
@@ -60,7 +60,7 @@ export async function updateTrip(before: Trip, input: TripInput): Promise<void> 
 }
 
 /** Video-call settings are saved on their own, so the rest of the form can't block them. */
-export async function updateCallSettings(trip: Trip, patch: Partial<Pick<Trip, 'callRoom' | 'whatsappGroupUrl'>>): Promise<void> {
+export async function updateCallSettings(trip: Trip, patch: Partial<Pick<Trip, 'callRoom' | 'whatsappGroupUrl' | 'googleMeetUrl'>>): Promise<void> {
   await updateDoc(tripRef(), { ...patch, updatedAt: serverTimestamp() });
   await logAudit('update', 'trip', trip.id, `Updated video call settings (${Object.keys(patch).join(', ')})`, null, patch as never);
 }
