@@ -15,6 +15,16 @@ import { Modal } from './ui/Modal';
 import { WhatsAppIcon } from './ShareWhatsApp';
 import { toast } from './ui/Toast';
 
+function MeetIcon({ className }: { className: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="6" width="13" height="12" rx="2" />
+      <path d="m15 10 5-3v10l-5-3" />
+      <path d="M6 10h5M6 14h3" />
+    </svg>
+  );
+}
+
 export function CallButtons({ size = 'md', className = '', askToNotify = true, explainIfMissing = false }: { size?: 'sm' | 'md' | 'lg'; className?: string; askToNotify?: boolean; explainIfMissing?: boolean }) {
   const trip = useSession((s) => s.trip);
   const me = useSession((s) => s.member);
@@ -22,9 +32,11 @@ export function CallButtons({ size = 'md', className = '', askToNotify = true, e
   const [asking, setAsking] = useState(false);
   const room = trip?.callRoom;
   const group = trip?.whatsappGroupUrl;
+  const meet = trip?.googleMeetUrl;
+  const [link, setLink] = useState('/call');
   const icon = size === 'sm' ? 'size-4' : 'size-5';
 
-  if (!room && !group) {
+  if (!room && !group && !meet) {
     if (admin) return <Link to="/admin/settings" className={buttonClass(explainIfMissing ? 'primary' : 'secondary', size, className)}><Video className={icon} /> Set up video calls</Link>;
     return explainIfMissing ? (
       <p className="rounded-2xl bg-amber-50 p-4 text-amber-900">Video calls aren’t set up yet. Ask the trip admin to open <b>Trip Settings → Video calls</b> and tap <b>Create call link</b>.</p>
@@ -33,7 +45,8 @@ export function CallButtons({ size = 'md', className = '', askToNotify = true, e
 
   const tell = async () => {
     setAsking(false);
-    await notify({ type: 'video_call', title: `${me?.displayName ?? 'Someone'} started a video call`, body: 'Tap to join the trip video call.', link: '/call', target: 'all' });
+    const viaMeet = link.includes('meet');
+    await notify({ type: 'video_call', title: `${me?.displayName ?? 'Someone'} started a ${viaMeet ? 'Google Meet' : 'video'} call`, body: `Tap to join the trip ${viaMeet ? 'Google Meet' : 'video'} call.`, link, target: 'all' });
     toast.success('Everyone has been notified');
   };
 
@@ -44,10 +57,27 @@ export function CallButtons({ size = 'md', className = '', askToNotify = true, e
           href={jitsiUrl(room, me?.displayName ?? '')}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={() => askToNotify && setAsking(true)}
+          onClick={() => {
+            setLink('/call');
+            if (askToNotify) setAsking(true);
+          }}
           className={buttonClass('primary', size)}
         >
           <Video className={icon} /> Video call
+        </a>
+      )}
+      {meet && (
+        <a
+          href={meet}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => {
+            setLink('/call?app=meet');
+            if (askToNotify) setAsking(true);
+          }}
+          className={buttonClass('secondary', size, 'border-sky-200 text-sky-800 hover:border-sky-400 hover:bg-sky-50')}
+        >
+          <MeetIcon className={icon} /> Google Meet
         </a>
       )}
       {group && (

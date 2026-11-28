@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isWhatsappGroupUrl, jitsiUrl, makeCallRoom, normaliseWhatsappGroupUrl, CALL_ROOM_RE } from './call';
+import { isMeetUrl, normaliseMeetUrl, isWhatsappGroupUrl, jitsiUrl, makeCallRoom, normaliseWhatsappGroupUrl, CALL_ROOM_RE } from './call';
 
 describe('video call helpers', () => {
   it('makes a URL-safe room id', () => {
@@ -24,5 +24,12 @@ describe('video call helpers', () => {
     expect(isWhatsappGroupUrl('https://wa.me/919876543210')).toBe(false);
     expect(isWhatsappGroupUrl('https://chat.whatsapp.com/')).toBe(false);
     expect(isWhatsappGroupUrl('just some text')).toBe(false);
+  });
+  it('validates Google Meet links', () => {
+    expect(normaliseMeetUrl('Join with Google Meet: https://meet.google.com/abc-defg-hij?authuser=0')).toBe('https://meet.google.com/abc-defg-hij');
+    expect(normaliseMeetUrl('meet.google.com/ABC-DEFG-HIJ')).toBe('https://meet.google.com/abc-defg-hij');
+    expect(isMeetUrl('https://meet.google.com/abc-defg-hij')).toBe(true);
+    expect(isMeetUrl('https://meet.google.com/new')).toBe(false);
+    expect(isMeetUrl('https://zoom.us/j/123')).toBe(false);
   });
 });

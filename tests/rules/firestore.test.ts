@@ -431,6 +431,8 @@ describe('video call settings', () => {
     await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, whatsappGroupUrl: '' }));
     await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, whatsappGroupUrl: 'https://evil.example/x' }));
     await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { ...base, callRoom: 'bad room/../x' }));
+    await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { googleMeetUrl: 'https://meet.google.com/abc-defg-hij' }));
+    await assertFails(updateDoc(doc(db('owner'), `trips/${T}`), { googleMeetUrl: 'https://evil.example/abc-defg-hij' }));
   });
   it('admin can save just the call fields (as the Video calls card does)', async () => {
     await assertSucceeds(updateDoc(doc(db('owner'), `trips/${T}`), { callRoom: 'trip-only123', updatedAt: serverTimestamp() }));
@@ -438,5 +440,6 @@ describe('video call settings', () => {
   });
   it('members cannot change them', async () => {
     await assertFails(updateDoc(doc(db('alice'), `trips/${T}`), { ...base, callRoom: 'trip-mine' }));
+    await assertFails(updateDoc(doc(db('alice'), `trips/${T}`), { googleMeetUrl: 'https://meet.google.com/abc-defg-hij' }));
   });
 });

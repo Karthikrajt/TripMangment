@@ -32,3 +32,16 @@ export function normaliseWhatsappGroupUrl(v: string): string {
 export function isWhatsappGroupUrl(v: string): boolean {
   return WHATSAPP_GROUP_RE.test(normaliseWhatsappGroupUrl(v));
 }
+
+/** Google Meet: meet.google.com/abc-defg-hij (works with free Gmail accounts). */
+export const MEET_RE = /^https:\/\/meet\.google\.com\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/;
+
+/** Picks the Meet link out of pasted text ("Join with Google Meet: …", ?authuser=0, etc.). */
+export function normaliseMeetUrl(v: string): string {
+  const m = /(?:https?:\/\/)?meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})\b/i.exec(v);
+  return m ? `https://meet.google.com/${m[1].toLowerCase()}` : v.trim();
+}
+
+export function isMeetUrl(v: string): boolean {
+  return MEET_RE.test(normaliseMeetUrl(v));
+}

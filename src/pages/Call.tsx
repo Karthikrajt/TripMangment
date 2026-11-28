@@ -19,6 +19,7 @@ export default function Call() {
           <ul className="space-y-1 text-left text-sm text-slate-500">
             <li>• <b>Video call</b> opens the trip’s private room (Jitsi Meet) – in the browser, or the Jitsi Meet app on phones if installed.</li>
             <li>• The first person to open the room signs in once with Google; everyone else just joins.</li>
+            <li>• <b>Google Meet</b> opens the trip’s Meet link (Google Meet app or browser). On free Gmail, calls with 3+ people end after 60 minutes – tap it again to restart.</li>
             <li>• <b>WhatsApp group</b> opens your trip group – tap the video icon there for a WhatsApp group call (up to 32 people).</li>
           </ul>
         </CardBody>
